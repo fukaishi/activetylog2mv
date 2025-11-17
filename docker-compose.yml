@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: activity-video-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend-uploads:/app/uploads
+      - backend-outputs:/app/outputs
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    networks:
+      - activity-video-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: activity-video-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_API_URL=http://localhost:8000
+    env_file:
+      - ./frontend/.env
+    restart: unless-stopped
+    networks:
+      - activity-video-network
+    depends_on:
+      - backend
+
+volumes:
+  backend-uploads:
+  backend-outputs:
+
+networks:
+  activity-video-network:
+    driver: bridge

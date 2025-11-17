@@ -38,6 +38,101 @@ GPX/TCX/FITファイルから動画を生成するWebアプリケーション
 
 ## セットアップ
 
+### オプション1: Docker Compose (推奨)
+
+最も簡単な起動方法です。
+
+#### 前提条件
+- Docker
+- Docker Compose
+
+#### 起動手順
+
+**方法A: Makefileを使用（簡単）**
+
+1. **Supabaseプロジェクトの作成**
+   - [Supabase](https://supabase.com)でプロジェクトを作成
+   - プロジェクトのURL、anon key、service keyを取得
+
+2. **セットアップと起動**
+   ```bash
+   # 環境変数ファイルの作成と起動を一括で実行
+   make dev
+
+   # 各.envファイルを編集してSupabaseの認証情報を設定してから再起動
+   # - .env
+   # - backend/.env
+   # - frontend/.env
+   make restart
+   ```
+
+3. **その他の便利なコマンド**
+   ```bash
+   make help           # 利用可能なコマンド一覧を表示
+   make logs           # ログを表示
+   make logs-backend   # バックエンドのログのみ表示
+   make logs-frontend  # フロントエンドのログのみ表示
+   make restart        # 再起動
+   make down           # 停止
+   make clean          # 完全削除
+   ```
+
+**方法B: docker-composeコマンドを直接使用**
+
+1. **Supabaseプロジェクトの作成**
+   - [Supabase](https://supabase.com)でプロジェクトを作成
+   - プロジェクトのURL、anon key、service keyを取得
+
+2. **環境変数の設定**
+   ```bash
+   # ルートディレクトリに.envファイルを作成
+   cp .env.example .env
+
+   # バックエンド用
+   cp backend/.env.example backend/.env
+
+   # フロントエンド用
+   cp frontend/.env.example frontend/.env
+
+   # 各.envファイルを編集してSupabaseの認証情報を設定
+   ```
+
+3. **アプリケーションの起動**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **アクセス**
+   - フロントエンド: http://localhost:3000
+   - バックエンドAPI: http://localhost:8000
+   - APIドキュメント: http://localhost:8000/docs
+
+5. **ログの確認**
+   ```bash
+   # 全サービスのログを表示
+   docker-compose logs -f
+
+   # バックエンドのログのみ
+   docker-compose logs -f backend
+
+   # フロントエンドのログのみ
+   docker-compose logs -f frontend
+   ```
+
+6. **停止**
+   ```bash
+   docker-compose down
+   ```
+
+7. **完全削除（ボリュームも含む）**
+   ```bash
+   docker-compose down -v
+   ```
+
+### オプション2: ローカル環境での起動
+
+Docker を使わずにローカル環境で起動する場合。
+
 ### 1. Supabaseプロジェクトの作成
 
 1. [Supabase](https://supabase.com)でプロジェクトを作成
@@ -136,11 +231,106 @@ VITE_API_URL=http://localhost:8000
 ### GET /api/health
 ヘルスチェック
 
+## Docker コマンド早見表
+
+```bash
+# コンテナの起動（バックグラウンド）
+docker-compose up -d
+
+# コンテナの起動（ログ表示）
+docker-compose up
+
+# コンテナの停止
+docker-compose stop
+
+# コンテナの停止と削除
+docker-compose down
+
+# コンテナの再起動
+docker-compose restart
+
+# 特定のサービスのみ再起動
+docker-compose restart backend
+
+# イメージの再ビルド
+docker-compose build
+
+# イメージ再ビルド後に起動
+docker-compose up -d --build
+
+# コンテナの状態確認
+docker-compose ps
+
+# リソースの完全削除（コンテナ、ネットワーク、ボリューム）
+docker-compose down -v --rmi all
+
+# バックエンドコンテナに入る
+docker-compose exec backend bash
+
+# フロントエンドコンテナに入る
+docker-compose exec frontend sh
+```
+
+## トラブルシューティング
+
+### ポートが既に使用されている
+
+```bash
+# 使用中のポートを確認
+sudo lsof -i :8000  # バックエンド
+sudo lsof -i :3000  # フロントエンド
+
+# docker-compose.ymlのポートを変更
+# 例: "8001:8000" や "3001:3000"
+```
+
+### コンテナが起動しない
+
+```bash
+# ログを確認
+docker-compose logs backend
+docker-compose logs frontend
+
+# コンテナの状態を確認
+docker-compose ps
+
+# 完全にクリーンアップして再起動
+docker-compose down -v
+docker-compose up -d --build
+```
+
+### 環境変数が反映されない
+
+```bash
+# .envファイルが正しく設定されているか確認
+cat .env
+cat backend/.env
+cat frontend/.env
+
+# コンテナを再作成
+docker-compose down
+docker-compose up -d
+```
+
+### 動画生成でエラーが発生する
+
+バックエンドコンテナにffmpegやフォントがインストールされているか確認:
+
+```bash
+docker-compose exec backend bash
+ffmpeg -version
+ls /usr/share/fonts/truetype/dejavu/
+```
+
 ## プロジェクト構成
 
 ```
 activetylog2mv/
+├── docker-compose.yml          # Docker Compose設定
+├── .env.example                # 環境変数のサンプル
 ├── backend/
+│   ├── Dockerfile              # バックエンド用Dockerfile
+│   ├── .dockerignore
 │   ├── app/
 │   │   ├── api/
 │   │   │   └── routes.py          # APIエンドポイント
