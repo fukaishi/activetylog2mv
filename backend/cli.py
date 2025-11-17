@@ -214,7 +214,12 @@ def analyze_activity_data(activity_data: Dict, file_path: str):
     for i, point in enumerate(activity_data['points'][:5]):
         print(f"  Point {i+1}:")
         print(f"    Time: {point.get('elapsed_time', 0):.2f}s")
-        print(f"    Location: {point.get('latitude', 'N/A'):.6f}, {point.get('longitude', 'N/A'):.6f}")
+        lat = point.get('latitude')
+        lon = point.get('longitude')
+        if lat is not None and lon is not None:
+            print(f"    Location: {lat:.6f}, {lon:.6f}")
+        else:
+            print(f"    Location: N/A (no GPS data)")
         if point.get('elevation') is not None:
             print(f"    Elevation: {point['elevation']:.2f}m")
         if point.get('speed'):
@@ -315,6 +320,18 @@ def main():
     if args.analyze:
         analyze_activity_data(activity_data, args.input)
         sys.exit(0)
+
+    # Check if GPS coordinates exist (required for video generation)
+    has_gps_data = any(
+        point.get('latitude') is not None and point.get('longitude') is not None
+        for point in activity_data['points']
+    )
+    if not has_gps_data:
+        print(f"Error: File does not contain GPS coordinates.", file=sys.stderr)
+        print(f"This appears to be an indoor activity without location data.", file=sys.stderr)
+        print(f"Video generation requires GPS coordinates to display the route and location.", file=sys.stderr)
+        print(f"Tip: Use the --analyze (-a) flag to view the available data in this file.", file=sys.stderr)
+        sys.exit(1)
 
     # Generate video
     generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose)
