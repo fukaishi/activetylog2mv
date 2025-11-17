@@ -100,17 +100,31 @@ def parse_activity_file(file_path: str, file_type: str, verbose: bool = False):
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
+        # Validate parsed data
+        if not activity_data['points']:
+            print(f"Error: No GPS points found in the file", file=sys.stderr)
+            print(f"The file may be empty or contain only waypoints/routes without trackpoints", file=sys.stderr)
+            sys.exit(1)
+
+        if activity_data['total_duration'] == 0:
+            print(f"Warning: No time data found in file. Duration will be estimated based on distance.", file=sys.stderr)
+
         if verbose:
             print(f"✓ Parsed successfully")
             print(f"  Points: {len(activity_data['points'])}")
-            print(f"  Duration: {activity_data['total_duration']:.2f} seconds")
+            print(f"  Duration: {activity_data['total_duration']:.2f} seconds ({activity_data['total_duration']/60:.2f} minutes)")
             print(f"  Distance: {activity_data['total_distance']/1000:.2f} km")
             print(f"  Max Speed: {activity_data['max_speed']:.2f} km/h")
+            if activity_data['avg_speed'] > 0:
+                print(f"  Avg Speed: {activity_data['avg_speed']:.2f} km/h")
 
         return activity_data
 
     except Exception as e:
         print(f"Error parsing file: {e}", file=sys.stderr)
+        import traceback
+        if verbose:
+            traceback.print_exc()
         sys.exit(1)
 
 

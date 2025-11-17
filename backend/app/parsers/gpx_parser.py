@@ -79,7 +79,30 @@ class GPXParser:
         activity_data['points'] = all_points
 
         if all_points:
-            activity_data['total_duration'] = all_points[-1]['elapsed_time']
+            # If we have time data, use it
+            if all_points[-1]['elapsed_time'] > 0:
+                activity_data['total_duration'] = all_points[-1]['elapsed_time']
+            else:
+                # No time data - estimate based on distance and assumed average speed (15 km/h)
+                # Or use point count with 1 second interval
+                if activity_data['total_distance'] > 0:
+                    # Estimate duration: assume average speed of 15 km/h (4.17 m/s)
+                    assumed_speed_ms = 15 / 3.6  # 15 km/h in m/s
+                    estimated_duration = activity_data['total_distance'] / assumed_speed_ms
+                    activity_data['total_duration'] = estimated_duration
+
+                    # Recalculate elapsed_time for each point based on distance proportion
+                    cumulative_distance = 0
+                    for i, point in enumerate(all_points):
+                        if i > 0:
+                            cumulative_distance += point['distance']
+                        point['elapsed_time'] = (cumulative_distance / activity_data['total_distance']) * estimated_duration if activity_data['total_distance'] > 0 else 0
+                else:
+                    # Fallback: 1 second per point
+                    activity_data['total_duration'] = len(all_points)
+                    for i, point in enumerate(all_points):
+                        point['elapsed_time'] = i
+
             activity_data['avg_speed'] = (activity_data['total_distance'] / activity_data['total_duration'] * 3.6) if activity_data['total_duration'] > 0 else 0
 
         # Elevation data

@@ -81,6 +81,28 @@ class TCXParser:
 
         activity_data['points'] = all_points
 
+        # If duration is still 0 (no time data), estimate it
+        if activity_data['total_duration'] == 0 and all_points:
+            if all_points[-1]['elapsed_time'] > 0:
+                activity_data['total_duration'] = all_points[-1]['elapsed_time']
+            elif activity_data['total_distance'] > 0:
+                # Estimate duration: assume average speed of 15 km/h
+                assumed_speed_ms = 15 / 3.6
+                estimated_duration = activity_data['total_distance'] / assumed_speed_ms
+                activity_data['total_duration'] = estimated_duration
+
+                # Recalculate elapsed_time for each point
+                cumulative_distance = 0
+                for i, point in enumerate(all_points):
+                    if i > 0:
+                        cumulative_distance += point['distance']
+                    point['elapsed_time'] = (cumulative_distance / activity_data['total_distance']) * estimated_duration if activity_data['total_distance'] > 0 else 0
+            else:
+                # Fallback: 1 second per point
+                activity_data['total_duration'] = len(all_points)
+                for i, point in enumerate(all_points):
+                    point['elapsed_time'] = i
+
         if activity_data['total_duration'] > 0:
             activity_data['avg_speed'] = (activity_data['total_distance'] / activity_data['total_duration'] * 3.6)
 

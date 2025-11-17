@@ -72,9 +72,7 @@ class FITParser:
 
         # Calculate statistics
         if all_points:
-            activity_data['total_duration'] = all_points[-1]['elapsed_time']
-
-            # Calculate total distance
+            # Calculate total distance first
             total_distance = 0
             for i in range(1, len(all_points)):
                 from math import radians, cos, sin, asin, sqrt
@@ -91,6 +89,38 @@ class FITParser:
                 total_distance += distance
 
             activity_data['total_distance'] = total_distance
+
+            # Set or estimate duration
+            if all_points[-1]['elapsed_time'] > 0:
+                activity_data['total_duration'] = all_points[-1]['elapsed_time']
+            elif total_distance > 0:
+                # Estimate duration: assume average speed of 15 km/h
+                assumed_speed_ms = 15 / 3.6
+                estimated_duration = total_distance / assumed_speed_ms
+                activity_data['total_duration'] = estimated_duration
+
+                # Recalculate elapsed_time for each point
+                cumulative_distance = 0
+                for i, point in enumerate(all_points):
+                    if i > 0:
+                        # Add distance from previous point
+                        lat1, lon1 = all_points[i-1]['latitude'], all_points[i-1]['longitude']
+                        lat2, lon2 = point['latitude'], point['longitude']
+                        from math import radians, cos, sin, asin, sqrt
+                        lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+                        dlon = lon2 - lon1
+                        dlat = lat2 - lat1
+                        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                        c = 2 * asin(sqrt(a))
+                        r = 6371000
+                        distance = c * r
+                        cumulative_distance += distance
+                    point['elapsed_time'] = (cumulative_distance / total_distance) * estimated_duration if total_distance > 0 else 0
+            else:
+                # Fallback: 1 second per point
+                activity_data['total_duration'] = len(all_points)
+                for i, point in enumerate(all_points):
+                    point['elapsed_time'] = i
 
             # Speed statistics
             speeds = [p['speed'] for p in all_points if p['speed'] > 0]
