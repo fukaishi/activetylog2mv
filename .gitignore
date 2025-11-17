@@ -46,6 +46,15 @@ Thumbs.db
 backend/uploads/
 backend/outputs/
 
+# CLI generated files
+*.mp4
+*.avi
+*.mov
+activities/
+videos/
+output/
+examples/*.mp4
+
 # Node
 node_modules/
 frontend/node_modules/

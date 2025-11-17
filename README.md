@@ -36,6 +36,37 @@ GPX/TCX/FITファイルから動画を生成するWebアプリケーション
 ### データベース
 - Supabase
 
+## クイックスタート
+
+### CLIツールで即座に変換（推奨）
+
+```bash
+# 1. リポジトリをクローン
+git clone <repository_url>
+cd activetylog2mv
+
+# 2. アクティビティファイルを変換
+./convert.sh your_activity.gpx
+```
+
+これだけで動画が生成されます！Webサーバーやデータベースの設定は不要です。
+
+### Dockerで全機能を使用
+
+```bash
+# 1. 環境変数を設定してアプリを起動
+make dev
+
+# 2. Supabase認証情報を設定
+# .env, backend/.env, frontend/.env を編集
+
+# 3. 再起動
+make restart
+
+# 4. ブラウザでアクセス
+# http://localhost:3000
+```
+
 ## セットアップ
 
 ### オプション1: Docker Compose (推奨)
@@ -198,6 +229,46 @@ VITE_API_URL=http://localhost:8000
 
 ## 使い方
 
+### オプション1: CLIツール（コマンドライン）
+
+Webアプリケーションを起動せずに、コマンドラインで直接変換できます。
+
+**基本的な使い方:**
+
+```bash
+# Linux/Mac
+./convert.sh input.gpx
+
+# Windows
+convert.bat input.gpx
+```
+
+**出力ファイル名を指定:**
+
+```bash
+./convert.sh input.gpx -o output.mp4
+```
+
+**カスタム設定:**
+
+```bash
+# HD解像度、60FPS
+./convert.sh input.gpx -o output.mp4 --width 1280 --height 720 --fps 60
+
+# 詳細な出力を表示
+./convert.sh input.gpx -v
+```
+
+**ヘルプを表示:**
+
+```bash
+./convert.sh --help
+```
+
+詳しい使い方は [CLI_USAGE.md](CLI_USAGE.md) を参照してください。
+
+### オプション2: Webアプリケーション
+
 1. アプリケーションにアクセス
 2. メールアドレスとパスワードでサインアップ/ログイン
 3. GPX/TCX/FITファイルをアップロード
@@ -327,10 +398,15 @@ ls /usr/share/fonts/truetype/dejavu/
 ```
 activetylog2mv/
 ├── docker-compose.yml          # Docker Compose設定
+├── Makefile                    # Docker操作用Makefile
 ├── .env.example                # 環境変数のサンプル
+├── convert.sh                  # CLIツール実行スクリプト（Linux/Mac）
+├── convert.bat                 # CLIツール実行スクリプト（Windows）
+├── CLI_USAGE.md                # CLIツール詳細ガイド
 ├── backend/
 │   ├── Dockerfile              # バックエンド用Dockerfile
 │   ├── .dockerignore
+│   ├── cli.py                  # CLIツール本体
 │   ├── app/
 │   │   ├── api/
 │   │   │   └── routes.py          # APIエンドポイント
@@ -349,6 +425,8 @@ activetylog2mv/
 │   ├── requirements.txt
 │   └── run.py
 ├── frontend/
+│   ├── Dockerfile              # フロントエンド用Dockerfile
+│   ├── .dockerignore
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Auth.jsx           # 認証コンポーネント
