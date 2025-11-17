@@ -84,10 +84,28 @@ python cli.py input.gpx
 ./convert.sh input.gpx --verbose
 ```
 
+### 解析モード（動画変換せず統計情報のみ表示）
+
+```bash
+# ファイルを解析して統計情報を表示
+./convert.sh input.gpx -a
+
+# または
+./convert.sh input.gpx --analyze
+```
+
+### タイムスタンプデータを必須とする
+
+```bash
+# 実際のタイムスタンプがないファイルはエラーにする
+./convert.sh input.gpx --require-time
+```
+
 ## オプション一覧
 
 ```
-使用法: cli.py [-h] [-o OUTPUT] [--width WIDTH] [--height HEIGHT] [--fps FPS] [-v] input
+使用法: cli.py [-h] [-o OUTPUT] [--width WIDTH] [--height HEIGHT] [--fps FPS]
+               [-v] [-a] [--require-time] input
 
 位置引数:
   input                 入力アクティビティファイル (GPX/TCX/FIT)
@@ -100,6 +118,8 @@ python cli.py input.gpx
   --height HEIGHT      動画の高さ（ピクセル）(デフォルト: 1080)
   --fps FPS            動画のフレームレート (デフォルト: 30)
   -v, --verbose        詳細な出力を表示
+  -a, --analyze        解析モード: 動画を生成せず統計情報のみ表示
+  --require-time       実際のタイムスタンプデータを必須とする（推定時間を拒否）
 ```
 
 ## 使用例
@@ -150,7 +170,74 @@ Done!
 ./convert.sh cycling.fit -o videos/cycling_hd.mp4 --width 1280 --height 720 --fps 60 -v
 ```
 
-### 例4: 複数ファイルの一括変換（バッチ処理）
+### 例4: 解析モード（動画を生成せず統計情報のみ表示）
+
+```bash
+./convert.sh activity.gpx -a
+```
+
+出力:
+```
+======================================================================
+Activity File Analysis: activity.gpx
+======================================================================
+
+📊 Basic Information:
+  Total Points: 1234
+  Has Timestamp Data: Yes
+
+⏱️  Time Information:
+  Total Duration: 00:30:23 (1823.50 seconds)
+
+📏 Distance Information:
+  Total Distance: 5.42 km (5420.00 m)
+
+⚡ Speed Information:
+  Average Speed: 10.67 km/h
+  Maximum Speed: 25.30 km/h
+
+🏔️  Elevation Information:
+  Maximum Elevation: 125.30 m
+  Minimum Elevation: 45.20 m
+  Total Elevation Gain: 145.60 m
+  Total Elevation Loss: 132.40 m
+
+📈 Additional Data Fields:
+  - Heart Rate
+  - Cadence
+
+📍 Sample Data Points (first 5):
+  Point 1:
+    Time: 0.00s
+    Location: 35.123456, 139.123456
+    Elevation: 45.20m
+    Speed: 0.00 km/h
+    Heart Rate: 85 bpm
+  Point 2:
+    Time: 1.00s
+    Location: 35.123457, 139.123457
+    Elevation: 45.30m
+    Speed: 8.50 km/h
+    Heart Rate: 88 bpm
+  ...
+======================================================================
+```
+
+### 例5: タイムスタンプデータを必須とする
+
+```bash
+# タイムスタンプがないファイルはエラーにする
+./convert.sh route.gpx --require-time
+```
+
+出力（タイムスタンプがない場合）:
+```
+Error: File does not contain actual timestamp data.
+The file only has GPS coordinates without time information.
+Please use a file with recorded timestamps, or remove the --require-time flag.
+```
+
+### 例6: 複数ファイルの一括変換（バッチ処理）
 
 **Linux/Mac:**
 ```bash

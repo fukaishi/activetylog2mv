@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, concatenate_videoclips
 import os
-from typing import Dict, List
+from typing import Dict, List, Callable, Optional
 
 
 class VideoGenerator:
@@ -12,7 +12,7 @@ class VideoGenerator:
         self.height = height
         self.fps = fps
 
-    def create_video(self, activity_data: Dict, output_path: str) -> str:
+    def create_video(self, activity_data: Dict, output_path: str, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> str:
         """
         Create a video from activity data
 
@@ -32,6 +32,9 @@ class VideoGenerator:
         # Calculate total frames needed
         total_frames = int(total_duration * self.fps)
 
+        if progress_callback:
+            progress_callback(0, total_frames, "Generating frames...")
+
         # Generate frames
         frames = []
         for frame_idx in range(total_frames):
@@ -44,13 +47,23 @@ class VideoGenerator:
             frame = self._create_frame(point_data, current_time, activity_data)
             frames.append(frame)
 
+            # Report progress every 10 frames or at the end
+            if progress_callback and (frame_idx % 10 == 0 or frame_idx == total_frames - 1):
+                progress_callback(frame_idx + 1, total_frames, "Generating frames...")
+
+        if progress_callback:
+            progress_callback(total_frames, total_frames, "Creating video clips...")
+
         # Create video from frames using moviepy
         clips = []
         frame_duration = 1.0 / self.fps
 
-        for frame in frames:
+        for i, frame in enumerate(frames):
             clip = ImageClip(frame).set_duration(frame_duration)
             clips.append(clip)
+
+            if progress_callback and (i % 100 == 0 or i == len(frames) - 1):
+                progress_callback(i + 1, len(frames), "Creating video clips...")
 
         final_clip = concatenate_videoclips(clips, method="compose")
         final_clip.write_videofile(

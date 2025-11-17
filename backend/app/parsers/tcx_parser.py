@@ -19,11 +19,14 @@ class TCXParser:
             'min_elevation': None,
             'total_elevation_gain': 0,
             'total_elevation_loss': 0,
+            'has_time_data': False,
         }
 
         # Get activity data
         activity_data['total_distance'] = tcx.distance if tcx.distance else 0
         activity_data['total_duration'] = tcx.duration if tcx.duration else 0
+        if activity_data['total_duration'] > 0:
+            activity_data['has_time_data'] = True
 
         # Parse trackpoints
         start_time = None
@@ -85,6 +88,7 @@ class TCXParser:
         if activity_data['total_duration'] == 0 and all_points:
             if all_points[-1]['elapsed_time'] > 0:
                 activity_data['total_duration'] = all_points[-1]['elapsed_time']
+                activity_data['has_time_data'] = True
             elif activity_data['total_distance'] > 0:
                 # Estimate duration: assume average speed of 15 km/h
                 assumed_speed_ms = 15 / 3.6

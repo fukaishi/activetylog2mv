@@ -20,6 +20,7 @@ class GPXParser:
             'min_elevation': None,
             'total_elevation_gain': 0,
             'total_elevation_loss': 0,
+            'has_time_data': False,  # Flag to indicate if file has actual timestamp data
         }
 
         all_points = []
@@ -82,6 +83,7 @@ class GPXParser:
             # If we have time data, use it
             if all_points[-1]['elapsed_time'] > 0:
                 activity_data['total_duration'] = all_points[-1]['elapsed_time']
+                activity_data['has_time_data'] = True
             else:
                 # No time data - estimate based on distance and assumed average speed (15 km/h)
                 # Or use point count with 1 second interval

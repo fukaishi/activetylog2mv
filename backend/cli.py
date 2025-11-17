@@ -74,6 +74,18 @@ Examples:
         help='Enable verbose output'
     )
 
+    parser.add_argument(
+        '-a', '--analyze',
+        action='store_true',
+        help='Analyze mode: show file statistics without generating video'
+    )
+
+    parser.add_argument(
+        '--require-time',
+        action='store_true',
+        help='Require actual timestamp data in file (reject estimated time)'
+    )
+
     return parser.parse_args()
 
 
@@ -109,6 +121,11 @@ def parse_activity_file(file_path: str, file_type: str, verbose: bool = False):
         if activity_data['total_duration'] == 0:
             print(f"Warning: No time data found in file. Duration will be estimated based on distance.", file=sys.stderr)
 
+        # Check if time data is required
+        if not activity_data.get('has_time_data', False):
+            if verbose or not activity_data.get('has_time_data', False):
+                print(f"Warning: File does not contain actual timestamp data. Time will be estimated.", file=sys.stderr)
+
         if verbose:
             print(f"✓ Parsed successfully")
             print(f"  Points: {len(activity_data['points'])}")
@@ -128,6 +145,85 @@ def parse_activity_file(file_path: str, file_type: str, verbose: bool = False):
         sys.exit(1)
 
 
+def print_progress(current: int, total: int, stage: str):
+    """Print progress bar"""
+    percent = (current / total) * 100 if total > 0 else 0
+    bar_length = 40
+    filled_length = int(bar_length * current // total) if total > 0 else 0
+    bar = '=' * filled_length + '-' * (bar_length - filled_length)
+    print(f'\r{stage} [{bar}] {percent:.1f}% ({current}/{total})', end='', flush=True)
+    if current >= total:
+        print()  # New line when complete
+
+
+def analyze_activity_data(activity_data: Dict, file_path: str):
+    """Display detailed analysis of activity data"""
+    print("=" * 70)
+    print(f"Activity File Analysis: {os.path.basename(file_path)}")
+    print("=" * 70)
+
+    # Basic info
+    print(f"\n📊 Basic Information:")
+    print(f"  Total Points: {len(activity_data['points'])}")
+    print(f"  Has Timestamp Data: {'Yes' if activity_data.get('has_time_data', False) else 'No (estimated)'}")
+
+    # Time info
+    duration = activity_data['total_duration']
+    hours = int(duration // 3600)
+    minutes = int((duration % 3600) // 60)
+    seconds = int(duration % 60)
+    print(f"\n⏱️  Time Information:")
+    print(f"  Total Duration: {hours:02d}:{minutes:02d}:{seconds:02d} ({duration:.2f} seconds)")
+
+    # Distance info
+    distance_km = activity_data['total_distance'] / 1000
+    print(f"\n📏 Distance Information:")
+    print(f"  Total Distance: {distance_km:.2f} km ({activity_data['total_distance']:.2f} m)")
+
+    # Speed info
+    print(f"\n⚡ Speed Information:")
+    print(f"  Average Speed: {activity_data['avg_speed']:.2f} km/h")
+    print(f"  Maximum Speed: {activity_data['max_speed']:.2f} km/h")
+
+    # Elevation info
+    if activity_data['max_elevation'] is not None:
+        print(f"\n🏔️  Elevation Information:")
+        print(f"  Maximum Elevation: {activity_data['max_elevation']:.2f} m")
+        print(f"  Minimum Elevation: {activity_data['min_elevation']:.2f} m")
+        print(f"  Total Elevation Gain: {activity_data['total_elevation_gain']:.2f} m")
+        print(f"  Total Elevation Loss: {activity_data['total_elevation_loss']:.2f} m")
+
+    # Check for additional data fields
+    first_point = activity_data['points'][0] if activity_data['points'] else {}
+    available_fields = []
+    if first_point.get('heart_rate'):
+        available_fields.append('Heart Rate')
+    if first_point.get('cadence'):
+        available_fields.append('Cadence')
+    if first_point.get('power'):
+        available_fields.append('Power')
+
+    if available_fields:
+        print(f"\n📈 Additional Data Fields:")
+        for field in available_fields:
+            print(f"  - {field}")
+
+    # Sample data points
+    print(f"\n📍 Sample Data Points (first 5):")
+    for i, point in enumerate(activity_data['points'][:5]):
+        print(f"  Point {i+1}:")
+        print(f"    Time: {point.get('elapsed_time', 0):.2f}s")
+        print(f"    Location: {point.get('latitude', 'N/A'):.6f}, {point.get('longitude', 'N/A'):.6f}")
+        if point.get('elevation') is not None:
+            print(f"    Elevation: {point['elevation']:.2f}m")
+        if point.get('speed'):
+            print(f"    Speed: {point['speed']:.2f} km/h")
+        if point.get('heart_rate'):
+            print(f"    Heart Rate: {point['heart_rate']} bpm")
+
+    print("=" * 70)
+
+
 def generate_video(activity_data, output_path: str, width: int, height: int, fps: int, verbose: bool = False):
     """Generate video from activity data"""
     if verbose:
@@ -138,7 +234,12 @@ def generate_video(activity_data, output_path: str, width: int, height: int, fps
 
     try:
         generator = VideoGenerator(width=width, height=height, fps=fps)
-        generator.create_video(activity_data, output_path)
+
+        # Use progress callback if not verbose
+        if not verbose:
+            generator.create_video(activity_data, output_path, progress_callback=print_progress)
+        else:
+            generator.create_video(activity_data, output_path)
 
         if verbose:
             print(f"✓ Video generated successfully: {output_path}")
@@ -171,26 +272,28 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Determine output path
-    if args.output:
-        output_path = args.output
-    else:
-        # Generate default output filename
-        input_path = Path(args.input)
-        output_path = str(input_path.with_suffix('.mp4'))
+    # Determine output path (skip if in analyze mode)
+    output_path = None
+    if not args.analyze:
+        if args.output:
+            output_path = args.output
+        else:
+            # Generate default output filename
+            input_path = Path(args.input)
+            output_path = str(input_path.with_suffix('.mp4'))
 
-    # Check if output directory exists
-    output_dir = os.path.dirname(output_path)
-    if output_dir and not os.path.exists(output_dir):
-        print(f"Error: Output directory does not exist: {output_dir}", file=sys.stderr)
-        sys.exit(1)
+        # Check if output directory exists
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            print(f"Error: Output directory does not exist: {output_dir}", file=sys.stderr)
+            sys.exit(1)
 
-    # Check if output file already exists
-    if os.path.exists(output_path):
-        response = input(f"Output file already exists: {output_path}. Overwrite? [y/N]: ")
-        if response.lower() not in ['y', 'yes']:
-            print("Aborted.")
-            sys.exit(0)
+        # Check if output file already exists
+        if os.path.exists(output_path):
+            response = input(f"Output file already exists: {output_path}. Overwrite? [y/N]: ")
+            if response.lower() not in ['y', 'yes']:
+                print("Aborted.")
+                sys.exit(0)
 
     if args.verbose:
         print("=" * 60)
@@ -200,6 +303,18 @@ def main():
     # Parse activity file
     activity_data = parse_activity_file(args.input, file_type, args.verbose)
 
+    # Check if --require-time flag is set
+    if args.require_time and not activity_data.get('has_time_data', False):
+        print(f"Error: File does not contain actual timestamp data.", file=sys.stderr)
+        print(f"The file only has GPS coordinates without time information.", file=sys.stderr)
+        print(f"Please use a file with recorded timestamps, or remove the --require-time flag.", file=sys.stderr)
+        sys.exit(1)
+
+    # Analyze mode - just show statistics and exit
+    if args.analyze:
+        analyze_activity_data(activity_data, args.input)
+        sys.exit(0)
+
     # Generate video
     generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose)
 
@@ -208,7 +323,7 @@ def main():
         print("Done!")
         print("=" * 60)
     else:
-        print(f"Video generated: {output_path}")
+        print(f"\nVideo generated: {output_path}")
 
 
 if __name__ == '__main__':

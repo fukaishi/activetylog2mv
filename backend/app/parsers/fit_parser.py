@@ -19,6 +19,7 @@ class FITParser:
             'min_elevation': None,
             'total_elevation_gain': 0,
             'total_elevation_loss': 0,
+            'has_time_data': False,
         }
 
         all_points = []
@@ -93,6 +94,7 @@ class FITParser:
             # Set or estimate duration
             if all_points[-1]['elapsed_time'] > 0:
                 activity_data['total_duration'] = all_points[-1]['elapsed_time']
+                activity_data['has_time_data'] = True
             elif total_distance > 0:
                 # Estimate duration: assume average speed of 15 km/h
                 assumed_speed_ms = 15 / 3.6
