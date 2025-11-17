@@ -7,6 +7,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Dict
 
 from app.parsers.gpx_parser import GPXParser
 from app.parsers.tcx_parser import TCXParser
