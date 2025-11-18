@@ -4,7 +4,7 @@
     <Activity Sport="Running">
       <Id>2024-01-15T09:00:00Z</Id>
       <Lap StartTime="2024-01-15T09:00:00Z">
-        <TotalTimeSeconds>300.0</TotalTimeSeconds>
+        <TotalTimeSeconds>30.0</TotalTimeSeconds>
         <DistanceMeters>0</DistanceMeters>
         <Track>
           <Trackpoint>
@@ -14,63 +14,39 @@
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:00:30Z</Time>
+            <Time>2024-01-15T09:00:05Z</Time>
             <HeartRateBpm>
               <Value>125</Value>
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:01:00Z</Time>
+            <Time>2024-01-15T09:00:10Z</Time>
             <HeartRateBpm>
               <Value>130</Value>
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:01:30Z</Time>
+            <Time>2024-01-15T09:00:15Z</Time>
             <HeartRateBpm>
               <Value>135</Value>
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:02:00Z</Time>
+            <Time>2024-01-15T09:00:20Z</Time>
             <HeartRateBpm>
               <Value>140</Value>
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:02:30Z</Time>
+            <Time>2024-01-15T09:00:25Z</Time>
             <HeartRateBpm>
               <Value>145</Value>
             </HeartRateBpm>
           </Trackpoint>
           <Trackpoint>
-            <Time>2024-01-15T09:03:00Z</Time>
+            <Time>2024-01-15T09:00:30Z</Time>
             <HeartRateBpm>
               <Value>150</Value>
-            </HeartRateBpm>
-          </Trackpoint>
-          <Trackpoint>
-            <Time>2024-01-15T09:03:30Z</Time>
-            <HeartRateBpm>
-              <Value>155</Value>
-            </HeartRateBpm>
-          </Trackpoint>
-          <Trackpoint>
-            <Time>2024-01-15T09:04:00Z</Time>
-            <HeartRateBpm>
-              <Value>158</Value>
-            </HeartRateBpm>
-          </Trackpoint>
-          <Trackpoint>
-            <Time>2024-01-15T09:04:30Z</Time>
-            <HeartRateBpm>
-              <Value>160</Value>
-            </HeartRateBpm>
-          </Trackpoint>
-          <Trackpoint>
-            <Time>2024-01-15T09:05:00Z</Time>
-            <HeartRateBpm>
-              <Value>162</Value>
             </HeartRateBpm>
           </Trackpoint>
         </Track>
