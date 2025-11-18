@@ -22,8 +22,11 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Convert GPX file to video
+  # Convert single GPX file to video
   python cli.py input.gpx
+
+  # Merge multiple files (GPX + TCX for GPS + heart rate)
+  python cli.py route.gpx heartrate.tcx -o output.mp4
 
   # Specify output file
   python cli.py input.gpx -o output.mp4
@@ -31,14 +34,18 @@ Examples:
   # Custom video settings
   python cli.py input.tcx -o output.mp4 --width 1280 --height 720 --fps 60
 
+  # Analyze multiple files before conversion
+  python cli.py route.gpx heartrate.tcx -a
+
   # Supported file formats: .gpx, .tcx, .fit
         """
     )
 
     parser.add_argument(
-        'input',
+        'inputs',
         type=str,
-        help='Input activity file (GPX/TCX/FIT)'
+        nargs='+',
+        help='Input activity file(s) (GPX/TCX/FIT). Multiple files will be merged by timestamp.'
     )
 
     parser.add_argument(
@@ -197,6 +204,138 @@ def parse_activity_file(file_path: str, file_type: str, verbose: bool = False):
         sys.exit(1)
 
 
+def merge_activity_data(activity_data_list, verbose: bool = False):
+    """
+    Merge multiple activity data by timestamp.
+    Priority: GPX for GPS/speed/distance, TCX for heart_rate
+    """
+    if len(activity_data_list) == 1:
+        return activity_data_list[0]
+
+    if verbose:
+        print(f"\nMerging {len(activity_data_list)} activity files...")
+
+    # Collect all points with their timestamps
+    all_points = []
+    file_types = {}  # Track which file each point came from
+
+    for idx, activity_data in enumerate(activity_data_list):
+        for point in activity_data['points']:
+            elapsed_time = point.get('elapsed_time', 0)
+            all_points.append({
+                'time': elapsed_time,
+                'point': point,
+                'file_idx': idx
+            })
+
+    # Sort by timestamp
+    all_points.sort(key=lambda x: x['time'])
+
+    # Group points by similar timestamps (within 1 second tolerance)
+    merged_points = []
+    time_tolerance = 1.0  # seconds
+
+    i = 0
+    while i < len(all_points):
+        current_time = all_points[i]['time']
+        group = [all_points[i]]
+
+        # Find all points within tolerance
+        j = i + 1
+        while j < len(all_points) and all_points[j]['time'] - current_time <= time_tolerance:
+            group.append(all_points[j])
+            j += 1
+
+        # Merge points in this time group
+        merged_point = {}
+
+        # Priority for GPS data: prefer GPX files
+        gps_point = None
+        for item in group:
+            if item['point'].get('latitude') is not None:
+                gps_point = item['point']
+                break
+
+        # Priority for heart rate: prefer TCX files (usually from heart rate monitors)
+        hr_point = None
+        for item in group:
+            if item['point'].get('heart_rate') is not None:
+                hr_point = item['point']
+                break
+
+        # Merge all available data
+        for item in group:
+            point = item['point']
+            for key, value in point.items():
+                if key not in merged_point or value is not None:
+                    # GPS data: prefer from gps_point
+                    if key in ['latitude', 'longitude'] and gps_point:
+                        merged_point[key] = gps_point[key]
+                    # Heart rate: prefer from hr_point
+                    elif key == 'heart_rate' and hr_point:
+                        merged_point[key] = hr_point.get(key)
+                    # Other fields: use first non-null value
+                    elif merged_point.get(key) is None:
+                        merged_point[key] = value
+
+        # Use average elapsed_time for the group
+        merged_point['elapsed_time'] = sum(item['time'] for item in group) / len(group)
+
+        merged_points.append(merged_point)
+        i = j
+
+    # Build merged activity_data
+    # Use the first activity_data as template
+    merged_data = activity_data_list[0].copy()
+    merged_data['points'] = merged_points
+
+    # Recalculate statistics
+    if merged_points:
+        # Distance and speed
+        total_distance = sum(p.get('distance', 0) for p in merged_points)
+        max_speed = max((p.get('speed', 0) for p in merged_points), default=0)
+        speeds = [p.get('speed', 0) for p in merged_points if p.get('speed', 0) > 0]
+        avg_speed = sum(speeds) / len(speeds) if speeds else 0
+
+        # Elevation
+        elevations = [p.get('elevation') for p in merged_points if p.get('elevation') is not None]
+        max_elevation = max(elevations) if elevations else None
+        min_elevation = min(elevations) if elevations else None
+
+        # Calculate elevation gain/loss
+        total_elevation_gain = 0
+        total_elevation_loss = 0
+        for i in range(1, len(merged_points)):
+            prev_elev = merged_points[i-1].get('elevation')
+            curr_elev = merged_points[i].get('elevation')
+            if prev_elev is not None and curr_elev is not None:
+                diff = curr_elev - prev_elev
+                if diff > 0:
+                    total_elevation_gain += diff
+                else:
+                    total_elevation_loss += abs(diff)
+
+        # Duration
+        total_duration = merged_points[-1].get('elapsed_time', 0)
+
+        # Update merged data
+        merged_data['total_distance'] = total_distance
+        merged_data['total_duration'] = total_duration
+        merged_data['max_speed'] = max_speed
+        merged_data['avg_speed'] = avg_speed
+        merged_data['max_elevation'] = max_elevation
+        merged_data['min_elevation'] = min_elevation
+        merged_data['total_elevation_gain'] = total_elevation_gain
+        merged_data['total_elevation_loss'] = total_elevation_loss
+
+    if verbose:
+        print(f"✓ Merged into {len(merged_points)} points")
+        print(f"  Duration: {merged_data['total_duration']:.2f} seconds")
+        print(f"  Distance: {merged_data['total_distance']/1000:.2f} km")
+
+    return merged_data
+
+
 def print_progress(current: int, total: int, stage: str):
     """Print progress bar"""
     percent = (current / total) * 100 if total > 0 else 0
@@ -332,14 +471,18 @@ def main():
     """Main CLI entry point"""
     args = parse_args()
 
-    # Check if input file exists
-    if not os.path.exists(args.input):
-        print(f"Error: Input file not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+    # Check if input files exist
+    for input_file in args.inputs:
+        if not os.path.exists(input_file):
+            print(f"Error: Input file not found: {input_file}", file=sys.stderr)
+            sys.exit(1)
 
-    # Detect file type
+    # Detect file types
+    file_types = []
     try:
-        file_type = detect_file_type(args.input)
+        for input_file in args.inputs:
+            file_type = detect_file_type(input_file)
+            file_types.append(file_type)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -350,9 +493,13 @@ def main():
         if args.output:
             output_path = args.output
         else:
-            # Generate default output filename
-            input_path = Path(args.input)
-            output_path = str(input_path.with_suffix('.mp4'))
+            # Generate default output filename from first input file
+            input_path = Path(args.inputs[0])
+            if len(args.inputs) > 1:
+                # Add "_merged" suffix for multiple files
+                output_path = str(input_path.with_stem(f"{input_path.stem}_merged").with_suffix('.mp4'))
+            else:
+                output_path = str(input_path.with_suffix('.mp4'))
 
         # Check if output directory exists
         output_dir = os.path.dirname(output_path)
@@ -372,8 +519,17 @@ def main():
         print("Activity Video Generator")
         print("=" * 60)
 
-    # Parse activity file
-    activity_data = parse_activity_file(args.input, file_type, args.verbose)
+    # Parse activity files
+    activity_data_list = []
+    for input_file, file_type in zip(args.inputs, file_types):
+        activity_data = parse_activity_file(input_file, file_type, args.verbose)
+        activity_data_list.append(activity_data)
+
+    # Merge activity data if multiple files
+    if len(activity_data_list) > 1:
+        activity_data = merge_activity_data(activity_data_list, args.verbose)
+    else:
+        activity_data = activity_data_list[0]
 
     # Check if --require-time flag is set
     if args.require_time and not activity_data.get('has_time_data', False):
@@ -384,7 +540,20 @@ def main():
 
     # Analyze mode - just show statistics and exit
     if args.analyze:
-        analyze_activity_data(activity_data, args.input)
+        if len(args.inputs) > 1:
+            # Show individual files first
+            for i, (input_file, data) in enumerate(zip(args.inputs, activity_data_list)):
+                print(f"\n{'='*70}")
+                print(f"File {i+1}/{len(args.inputs)}: {os.path.basename(input_file)}")
+                print(f"{'='*70}")
+                analyze_activity_data(data, input_file)
+            # Then show merged data
+            print(f"\n{'='*70}")
+            print(f"MERGED DATA ({len(args.inputs)} files)")
+            print(f"{'='*70}")
+            analyze_activity_data(activity_data, "merged")
+        else:
+            analyze_activity_data(activity_data, args.inputs[0])
         sys.exit(0)
 
     # Check if GPS coordinates exist (required for video generation)
