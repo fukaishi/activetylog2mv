@@ -28,8 +28,11 @@ Examples:
   # Merge multiple files (GPX + TCX for GPS + heart rate)
   python cli.py route.gpx heartrate.tcx -o output.mp4
 
-  # Specify output file
-  python cli.py input.gpx -o output.mp4
+  # Specify data source priorities by file index (1-based)
+  python cli.py file1.gpx file2.tcx --gps-source 1 --hr-source 2
+
+  # Specify data source priorities by filename
+  python cli.py route.gpx hr.tcx --gps-source route.gpx --hr-source hr.tcx
 
   # Custom video settings
   python cli.py input.tcx -o output.mp4 --width 1280 --height 720 --fps 60
@@ -145,6 +148,49 @@ Examples:
         help='Elevation graph position: bottom (下部全幅), top (上部全幅), bottom-left (左下), bottom-right (右下), bottom-center (下中央) (default: bottom)'
     )
 
+    # Data source priority options
+    parser.add_argument(
+        '--gps-source',
+        type=str,
+        default=None,
+        help='Priority file for GPS data (latitude/longitude). Specify filename or index (1, 2, ...). Default: auto-detect (prefer GPX)'
+    )
+
+    parser.add_argument(
+        '--speed-source',
+        type=str,
+        default=None,
+        help='Priority file for speed data. Specify filename or index (1, 2, ...). Default: auto-detect (prefer GPX)'
+    )
+
+    parser.add_argument(
+        '--elevation-source',
+        type=str,
+        default=None,
+        help='Priority file for elevation data. Specify filename or index (1, 2, ...). Default: auto-detect (prefer GPX)'
+    )
+
+    parser.add_argument(
+        '--hr-source',
+        type=str,
+        default=None,
+        help='Priority file for heart rate data. Specify filename or index (1, 2, ...). Default: auto-detect (prefer TCX)'
+    )
+
+    parser.add_argument(
+        '--cadence-source',
+        type=str,
+        default=None,
+        help='Priority file for cadence data. Specify filename or index (1, 2, ...). Default: first available'
+    )
+
+    parser.add_argument(
+        '--power-source',
+        type=str,
+        default=None,
+        help='Priority file for power data. Specify filename or index (1, 2, ...). Default: first available'
+    )
+
     return parser.parse_args()
 
 
@@ -204,16 +250,29 @@ def parse_activity_file(file_path: str, file_type: str, verbose: bool = False):
         sys.exit(1)
 
 
-def merge_activity_data(activity_data_list, verbose: bool = False):
+def merge_activity_data(activity_data_list, input_files, priority_sources=None, verbose: bool = False):
     """
     Merge multiple activity data by timestamp.
-    Priority: GPX for GPS/speed/distance, TCX for heart_rate
+
+    Args:
+        activity_data_list: List of parsed activity data
+        input_files: List of input file paths
+        priority_sources: Dict with priority settings {'gps': file_idx, 'hr': file_idx, ...}
+        verbose: Enable verbose output
+
+    Priority: GPX for GPS/speed/distance, TCX for heart_rate (default)
+    Can be overridden with priority_sources parameter
     """
     if len(activity_data_list) == 1:
         return activity_data_list[0]
 
     if verbose:
         print(f"\nMerging {len(activity_data_list)} activity files...")
+        if priority_sources:
+            print("  Data source priorities:")
+            for data_type, file_idx in priority_sources.items():
+                if file_idx is not None:
+                    print(f"    {data_type}: {os.path.basename(input_files[file_idx])}")
 
     # Collect all points with their timestamps
     all_points = []
@@ -235,6 +294,10 @@ def merge_activity_data(activity_data_list, verbose: bool = False):
     merged_points = []
     time_tolerance = 1.0  # seconds
 
+    # Default priority sources if not specified
+    if priority_sources is None:
+        priority_sources = {}
+
     i = 0
     while i < len(all_points):
         current_time = all_points[i]['time']
@@ -249,21 +312,35 @@ def merge_activity_data(activity_data_list, verbose: bool = False):
         # Merge points in this time group
         merged_point = {}
 
-        # Priority for GPS data: prefer GPX files
-        gps_point = None
-        for item in group:
-            if item['point'].get('latitude') is not None:
-                gps_point = item['point']
-                break
+        # Helper function to find point from specific source
+        def find_point_from_source(data_type, field_names):
+            """Find point with data from priority source"""
+            priority_idx = priority_sources.get(data_type)
 
-        # Priority for heart rate: prefer TCX files (usually from heart rate monitors)
-        hr_point = None
-        for item in group:
-            if item['point'].get('heart_rate') is not None:
-                hr_point = item['point']
-                break
+            # If priority source specified, use it
+            if priority_idx is not None:
+                for item in group:
+                    if item['file_idx'] == priority_idx:
+                        # Check if this point has the requested data
+                        if any(item['point'].get(field) is not None for field in field_names):
+                            return item['point']
 
-        # Merge all available data
+            # Otherwise use first available
+            for item in group:
+                if any(item['point'].get(field) is not None for field in field_names):
+                    return item['point']
+
+            return None
+
+        # Get priority points for different data types
+        gps_point = find_point_from_source('gps', ['latitude', 'longitude'])
+        speed_point = find_point_from_source('speed', ['speed'])
+        elevation_point = find_point_from_source('elevation', ['elevation'])
+        hr_point = find_point_from_source('hr', ['heart_rate'])
+        cadence_point = find_point_from_source('cadence', ['cadence'])
+        power_point = find_point_from_source('power', ['power'])
+
+        # Merge all available data with priorities
         for item in group:
             point = item['point']
             for key, value in point.items():
@@ -271,9 +348,21 @@ def merge_activity_data(activity_data_list, verbose: bool = False):
                     # GPS data: prefer from gps_point
                     if key in ['latitude', 'longitude'] and gps_point:
                         merged_point[key] = gps_point[key]
+                    # Speed: prefer from speed_point
+                    elif key == 'speed' and speed_point:
+                        merged_point[key] = speed_point.get(key)
+                    # Elevation: prefer from elevation_point
+                    elif key == 'elevation' and elevation_point:
+                        merged_point[key] = elevation_point.get(key)
                     # Heart rate: prefer from hr_point
                     elif key == 'heart_rate' and hr_point:
                         merged_point[key] = hr_point.get(key)
+                    # Cadence: prefer from cadence_point
+                    elif key == 'cadence' and cadence_point:
+                        merged_point[key] = cadence_point.get(key)
+                    # Power: prefer from power_point
+                    elif key == 'power' and power_point:
+                        merged_point[key] = power_point.get(key)
                     # Other fields: use first non-null value
                     elif merged_point.get(key) is None:
                         merged_point[key] = value
@@ -467,6 +556,44 @@ def generate_video(activity_data, output_path: str, width: int, height: int, fps
         sys.exit(1)
 
 
+def resolve_source_index(source_spec, input_files):
+    """
+    Resolve source specification to file index.
+
+    Args:
+        source_spec: Either a filename or an index (1-based)
+        input_files: List of input file paths
+
+    Returns:
+        File index (0-based) or None if not found
+    """
+    if source_spec is None:
+        return None
+
+    # Try to parse as integer index (1-based)
+    try:
+        idx = int(source_spec)
+        if 1 <= idx <= len(input_files):
+            return idx - 1  # Convert to 0-based
+        else:
+            print(f"Error: Index {idx} out of range. Valid range: 1-{len(input_files)}", file=sys.stderr)
+            sys.exit(1)
+    except ValueError:
+        pass
+
+    # Try to match as filename
+    for idx, input_file in enumerate(input_files):
+        if os.path.basename(input_file) == source_spec or input_file == source_spec:
+            return idx
+
+    # Not found
+    print(f"Error: Source file not found: {source_spec}", file=sys.stderr)
+    print(f"Available files:", file=sys.stderr)
+    for idx, f in enumerate(input_files, 1):
+        print(f"  {idx}: {f}", file=sys.stderr)
+    sys.exit(1)
+
+
 def main():
     """Main CLI entry point"""
     args = parse_args()
@@ -486,6 +613,16 @@ def main():
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # Process priority source options
+    priority_sources = {}
+    if len(args.inputs) > 1:
+        priority_sources['gps'] = resolve_source_index(args.gps_source, args.inputs)
+        priority_sources['speed'] = resolve_source_index(args.speed_source, args.inputs)
+        priority_sources['elevation'] = resolve_source_index(args.elevation_source, args.inputs)
+        priority_sources['hr'] = resolve_source_index(args.hr_source, args.inputs)
+        priority_sources['cadence'] = resolve_source_index(args.cadence_source, args.inputs)
+        priority_sources['power'] = resolve_source_index(args.power_source, args.inputs)
 
     # Determine output path (skip if in analyze mode)
     output_path = None
@@ -527,7 +664,7 @@ def main():
 
     # Merge activity data if multiple files
     if len(activity_data_list) > 1:
-        activity_data = merge_activity_data(activity_data_list, args.verbose)
+        activity_data = merge_activity_data(activity_data_list, args.inputs, priority_sources, args.verbose)
     else:
         activity_data = activity_data_list[0]
 
