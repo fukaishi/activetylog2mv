@@ -4,16 +4,18 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, concatenate_videoclips
 import os
 from typing import Dict, List, Callable, Optional
+from staticmap import StaticMap, Line, CircleMarker
 
 
 class VideoGenerator:
     def __init__(self, width: int = 1920, height: int = 1080, fps: int = 30,
-                 layout: str = 'corners', font_size: str = 'medium', items: str = None):
+                 layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False):
         self.width = width
         self.height = height
         self.fps = fps
         self.layout = layout
         self.font_size = font_size
+        self.show_map = show_map
 
         # Parse items configuration
         self.display_items = self._parse_items(items)
@@ -118,6 +120,37 @@ class VideoGenerator:
             if point['elapsed_time'] >= current_time:
                 return point
         return points[-1]
+
+    def _generate_map(self, activity_data: Dict, current_point: Dict) -> Image:
+        """Generate a map image showing the route and current position"""
+        # Create static map
+        m = StaticMap(self.width, self.height, url_template='http://a.tile.openstreetmap.org/{z}/{x}/{y}.png')
+
+        # Add route line (all points up to current)
+        route_coords = []
+        for point in activity_data['points']:
+            lat = point.get('latitude')
+            lon = point.get('longitude')
+            if lat and lon:
+                route_coords.append([lon, lat])
+                # Stop at current point
+                if point['elapsed_time'] >= current_point['elapsed_time']:
+                    break
+
+        if len(route_coords) > 1:
+            line = Line(route_coords, '#0066FF', 4)
+            m.add_line(line)
+
+        # Add current position marker
+        current_lat = current_point.get('latitude')
+        current_lon = current_point.get('longitude')
+        if current_lat and current_lon:
+            marker = CircleMarker((current_lon, current_lat), '#FF0000', 12)
+            m.add_marker(marker)
+
+        # Render map to PIL Image
+        map_image = m.render()
+        return map_image
 
     def _draw_rounded_rectangle(self, draw: ImageDraw.Draw, xy: tuple, radius: int, fill: tuple, outline: tuple = None, width: int = 0):
         """Draw a rounded rectangle"""
@@ -300,11 +333,17 @@ class VideoGenerator:
 
     def _create_frame(self, point_data: Dict, current_time: float, activity_data: Dict) -> np.ndarray:
         """Create a single frame with activity data overlay"""
-        # Create black background
-        frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        # Create background (map or black)
+        if self.show_map:
+            # Generate map with current position
+            pil_image = self._generate_map(activity_data, point_data)
+            # Ensure size matches
+            pil_image = pil_image.resize((self.width, self.height))
+        else:
+            # Create black background
+            frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+            pil_image = Image.fromarray(frame)
 
-        # Convert to PIL for better text rendering
-        pil_image = Image.fromarray(frame)
         draw = ImageDraw.Draw(pil_image)
 
         # Load font with specified size

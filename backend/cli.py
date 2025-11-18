@@ -110,6 +110,12 @@ Examples:
         help='Display items in format "1:speed,2:distance,3:elevation,4:heart_rate" (位置番号:項目名)'
     )
 
+    parser.add_argument(
+        '--show-map',
+        action='store_true',
+        help='Show map with current location and route (requires GPS data)'
+    )
+
     return parser.parse_args()
 
 
@@ -254,7 +260,7 @@ def analyze_activity_data(activity_data: Dict, file_path: str):
 
 
 def generate_video(activity_data, output_path: str, width: int, height: int, fps: int, verbose: bool = False,
-                   layout: str = 'corners', font_size: str = 'medium', items: str = None):
+                   layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False):
     """Generate video from activity data"""
     if verbose:
         print(f"\nGenerating video...")
@@ -265,10 +271,11 @@ def generate_video(activity_data, output_path: str, width: int, height: int, fps
         print(f"  Font size: {font_size}")
         if items:
             print(f"  Items: {items}")
+        print(f"  Show map: {show_map}")
 
     try:
         generator = VideoGenerator(width=width, height=height, fps=fps,
-                                  layout=layout, font_size=font_size, items=items)
+                                  layout=layout, font_size=font_size, items=items, show_map=show_map)
 
         # Use progress callback if not verbose
         if not verbose:
@@ -364,7 +371,7 @@ def main():
 
     # Generate video
     generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose,
-                  args.layout, args.font_size, args.items)
+                  args.layout, args.font_size, args.items, args.show_map)
 
     if args.verbose:
         print("=" * 60)
