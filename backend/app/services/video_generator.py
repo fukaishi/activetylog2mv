@@ -131,31 +131,56 @@ class VideoGenerator:
         draw.pieslice([x1, y2 - radius * 2, x1 + radius * 2, y2], 90, 180, fill=fill, outline=outline, width=width)
         draw.pieslice([x2 - radius * 2, y2 - radius * 2, x2, y2], 0, 90, fill=fill, outline=outline, width=width)
 
-    def _draw_text_with_background(self, draw: ImageDraw.Draw, position: tuple, text: str, font, text_color: tuple, bg_color: tuple, padding: int = 20, radius: int = 15):
+    def _draw_text_with_background(self, draw: ImageDraw.Draw, position: tuple, text: str, font, text_color: tuple, bg_color: tuple, padding: int = 20, radius: int = 15, fixed_width: int = None):
         """Draw text with rounded background"""
         # Get text size
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
+        # Use fixed width if specified, otherwise use text width
+        box_width = fixed_width if fixed_width else text_width
+
         x, y = position
         # Draw rounded rectangle background
         self._draw_rounded_rectangle(
             draw,
-            (x - padding, y - padding, x + text_width + padding, y + text_height + padding),
+            (x - padding, y - padding, x + box_width + padding, y + text_height + padding),
             radius,
             fill=bg_color
         )
         # Draw text
         draw.text((x, y), text, fill=text_color, font=font)
 
+    def _calculate_fixed_box_width(self, font):
+        """Calculate fixed box width based on longest expected text"""
+        # Use "ケイデンス: 100 rpm" as reference for width
+        sample_texts = [
+            "ケイデンス: 100 rpm",
+            "心拍数: 180 bpm",
+            "距離: 99.99 km",
+            "速度: 99.9 km/h",
+            "標高: 9999.9 m"
+        ]
+
+        max_width = 0
+        for text in sample_texts:
+            bbox = font.getbbox(text)
+            text_width = bbox[2] - bbox[0]
+            max_width = max(max_width, text_width)
+
+        return max_width
+
     def _display_corners_layout(self, draw: ImageDraw.Draw, items: List, font):
         """Display items in four corners (top-left, top-right, bottom-left, bottom-right)"""
+        # Calculate fixed width for consistent box sizes
+        fixed_width = self._calculate_fixed_box_width(font)
+
         positions = [
             (50, 50),                           # Position 1: Top-left
-            (self.width - 400, 50),             # Position 2: Top-right
+            (self.width - fixed_width - 90, 50),             # Position 2: Top-right
             (50, self.height - 120),            # Position 3: Bottom-left
-            (self.width - 400, self.height - 120)  # Position 4: Bottom-right
+            (self.width - fixed_width - 90, self.height - 120)  # Position 4: Bottom-right
         ]
 
         for i, (pos, text, bg_color) in enumerate(items):
@@ -168,7 +193,8 @@ class VideoGenerator:
                     (255, 255, 255),
                     bg_color,
                     padding=20,
-                    radius=15
+                    radius=15,
+                    fixed_width=fixed_width
                 )
 
     def _display_bottom_right_layout(self, draw: ImageDraw.Draw, items: List, font):
@@ -179,16 +205,16 @@ class VideoGenerator:
         padding = 20
         line_spacing = 10
 
-        # Calculate max width and total height needed
-        max_width = 0
+        # Use fixed width for consistent box size
+        fixed_width = self._calculate_fixed_box_width(font)
+
+        # Calculate total height needed
         total_height = 0
         text_heights = []
 
         for pos, text, bg_color in items:
             bbox = draw.textbbox((0, 0), text, font=font)
-            text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
-            max_width = max(max_width, text_width)
             text_heights.append(text_height)
             total_height += text_height
 
@@ -196,7 +222,7 @@ class VideoGenerator:
         total_height += line_spacing * (len(items) - 1)
 
         # Calculate box position (bottom-right corner)
-        box_width = max_width + padding * 2
+        box_width = fixed_width + padding * 2
         box_height = total_height + padding * 2
         box_x = self.width - box_width - 50
         box_y = self.height - box_height - 50
@@ -218,11 +244,15 @@ class VideoGenerator:
 
     def _display_top_layout(self, draw: ImageDraw.Draw, items: List, font):
         """Display all items horizontally at the top"""
-        total_width = self.width - 100
         num_items = len(items)
         if num_items == 0:
             return
 
+        # Calculate fixed width for consistent box sizes
+        fixed_width = self._calculate_fixed_box_width(font)
+
+        # Calculate spacing based on fixed width
+        total_width = self.width - 100
         spacing = total_width // num_items
         y = 50
 
@@ -236,16 +266,21 @@ class VideoGenerator:
                 (255, 255, 255),
                 bg_color,
                 padding=20,
-                radius=15
+                radius=15,
+                fixed_width=fixed_width
             )
 
     def _display_bottom_layout(self, draw: ImageDraw.Draw, items: List, font):
         """Display all items horizontally at the bottom"""
-        total_width = self.width - 100
         num_items = len(items)
         if num_items == 0:
             return
 
+        # Calculate fixed width for consistent box sizes
+        fixed_width = self._calculate_fixed_box_width(font)
+
+        # Calculate spacing based on fixed width
+        total_width = self.width - 100
         spacing = total_width // num_items
         y = self.height - 120
 
@@ -259,7 +294,8 @@ class VideoGenerator:
                 (255, 255, 255),
                 bg_color,
                 padding=20,
-                radius=15
+                radius=15,
+                fixed_width=fixed_width
             )
 
     def _create_frame(self, point_data: Dict, current_time: float, activity_data: Dict) -> np.ndarray:
