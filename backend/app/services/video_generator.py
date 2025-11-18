@@ -185,6 +185,27 @@ class VideoGenerator:
                 break
             current_distance += point.get('distance', 0) / 1000
 
+        # Set Japanese font
+        import matplotlib.font_manager as fm
+        japanese_fonts = [
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
+            "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+            "/usr/share/fonts/truetype/takao-gothic/TakaoPGothic.ttf",
+            "/usr/share/fonts/truetype/ipa-gothic/ipagp.ttf"
+        ]
+
+        font_prop = None
+        for font_path in japanese_fonts:
+            if os.path.exists(font_path):
+                font_prop = fm.FontProperties(fname=font_path)
+                break
+
+        # If no Japanese font found, use default
+        if not font_prop:
+            font_prop = fm.FontProperties()
+
         # Create matplotlib figure
         fig, ax = plt.subplots(figsize=(graph_width/100, graph_height/100), dpi=100)
         fig.patch.set_facecolor('#1a1a1a')
@@ -205,9 +226,9 @@ class VideoGenerator:
 
             ax.plot(current_distance, current_elevation, 'ro', markersize=10, zorder=5)
 
-        # Styling
-        ax.set_xlabel('距離 (km)', color='white', fontsize=12)
-        ax.set_ylabel('標高 (m)', color='white', fontsize=12)
+        # Styling with Japanese font
+        ax.set_xlabel('距離 (km)', color='white', fontsize=12, fontproperties=font_prop)
+        ax.set_ylabel('標高 (m)', color='white', fontsize=12, fontproperties=font_prop)
         ax.tick_params(colors='white')
         ax.grid(True, alpha=0.3, color='white')
         ax.spines['bottom'].set_color('white')
