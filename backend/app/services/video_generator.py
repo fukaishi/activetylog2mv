@@ -172,23 +172,49 @@ class VideoGenerator:
                 )
 
     def _display_bottom_right_layout(self, draw: ImageDraw.Draw, items: List, font):
-        """Display all items stacked in bottom-right corner"""
-        x = self.width - 450
-        y_start = self.height - 150
-        spacing = 80
+        """Display all items stacked in bottom-right corner within a single rounded box"""
+        if not items:
+            return
 
+        padding = 20
+        line_spacing = 10
+
+        # Calculate max width and total height needed
+        max_width = 0
+        total_height = 0
+        text_heights = []
+
+        for pos, text, bg_color in items:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            max_width = max(max_width, text_width)
+            text_heights.append(text_height)
+            total_height += text_height
+
+        # Add spacing between lines
+        total_height += line_spacing * (len(items) - 1)
+
+        # Calculate box position (bottom-right corner)
+        box_width = max_width + padding * 2
+        box_height = total_height + padding * 2
+        box_x = self.width - box_width - 50
+        box_y = self.height - box_height - 50
+
+        # Draw single rounded rectangle background
+        self._draw_rounded_rectangle(
+            draw,
+            (box_x, box_y, box_x + box_width, box_y + box_height),
+            radius=15,
+            fill=(40, 40, 40, 200)
+        )
+
+        # Draw each text item inside the box
+        current_y = box_y + padding
         for i, (pos, text, bg_color) in enumerate(items):
-            y = y_start - (i * spacing)
-            self._draw_text_with_background(
-                draw,
-                (x, y),
-                text,
-                font,
-                (255, 255, 255),
-                bg_color,
-                padding=20,
-                radius=15
-            )
+            text_x = box_x + padding
+            draw.text((text_x, current_y), text, fill=(255, 255, 255), font=font)
+            current_y += text_heights[i] + line_spacing
 
     def _display_top_layout(self, draw: ImageDraw.Draw, items: List, font):
         """Display all items horizontally at the top"""
