@@ -38,12 +38,16 @@ class VideoGenerator:
         Format: "1:speed,2:distance,3:elevation,4:heart_rate"
         """
         if not items_str:
-            # Default items based on layout
+            # Default items based on layout (up to 8 items for corners layout)
             return {
-                1: 'distance',
-                2: 'speed',
-                3: 'elevation',
-                4: 'heart_rate'
+                1: 'distance',      # 左上1
+                2: 'speed',         # 右上1
+                3: 'elevation',     # 左下1
+                4: 'heart_rate',    # 右下1
+                5: 'elapsed_time',  # 左上2
+                6: 'gradient',      # 右上2
+                7: 'cadence',       # 左下2
+                8: 'temperature'    # 右下2
             }
 
         items_map = {}
@@ -324,13 +328,18 @@ class VideoGenerator:
 
     def _calculate_fixed_box_width(self, font):
         """Calculate fixed box width based on longest expected text"""
-        # Use "ケイデンス: 100 rpm" as reference for width
+        # Sample texts for all possible items to ensure consistent width
         sample_texts = [
             "ケイデンス: 100 rpm",
             "心拍数: 180 bpm",
             "距離: 99.99 km",
             "速度: 99.9 km/h",
-            "標高: 9999.9 m"
+            "標高: 9999.9 m",
+            "走行時間: 12:34:56",
+            "勾配: +12.3%",
+            "気温: 35.5°C",
+            "カロリー: 9999 kcal",
+            "パワー: 999 W"
         ]
 
         max_width = 0
@@ -342,15 +351,23 @@ class VideoGenerator:
         return max_width
 
     def _display_corners_layout(self, draw: ImageDraw.Draw, items: List, font):
-        """Display items in four corners (top-left, top-right, bottom-left, bottom-right)"""
+        """Display items in four corners (up to 8 items: 2 per corner)"""
         # Calculate fixed width for consistent box sizes
         fixed_width = self._calculate_fixed_box_width(font)
 
+        # Calculate vertical spacing between two items in same corner
+        vertical_spacing = 90  # Space between item 1 and item 5, etc.
+
+        # Define 8 positions (2 per corner)
         positions = [
-            (50, 50),                           # Position 1: Top-left
-            (self.width - fixed_width - 90, 50),             # Position 2: Top-right
-            (50, self.height - 120),            # Position 3: Bottom-left
-            (self.width - fixed_width - 90, self.height - 120)  # Position 4: Bottom-right
+            (50, 50),                                            # Position 1: 左上1
+            (self.width - fixed_width - 90, 50),                 # Position 2: 右上1
+            (50, self.height - 120),                             # Position 3: 左下1
+            (self.width - fixed_width - 90, self.height - 120),  # Position 4: 右下1
+            (50, 50 + vertical_spacing),                         # Position 5: 左上2
+            (self.width - fixed_width - 90, 50 + vertical_spacing),     # Position 6: 右上2
+            (50, self.height - 120 - vertical_spacing),          # Position 7: 左下2
+            (self.width - fixed_width - 90, self.height - 120 - vertical_spacing)  # Position 8: 右下2
         ]
 
         for i, (pos, text, bg_color) in enumerate(items):
@@ -522,13 +539,49 @@ class VideoGenerator:
         speed = point_data.get('speed', 0)
         elevation = point_data.get('elevation', 0)
         heart_rate = point_data.get('heart_rate')
+        cadence = point_data.get('cadence')
+        temperature = point_data.get('temperature')
+        calories = point_data.get('calories')
+        power = point_data.get('power')
+
+        # Calculate gradient (勾配)
+        gradient = None
+        current_point_idx = None
+        for idx, point in enumerate(activity_data['points']):
+            if point['elapsed_time'] >= current_time:
+                current_point_idx = idx
+                break
+
+        if current_point_idx and current_point_idx > 0:
+            prev_point = activity_data['points'][current_point_idx - 1]
+            curr_point = activity_data['points'][current_point_idx]
+
+            prev_elev = prev_point.get('elevation')
+            curr_elev = curr_point.get('elevation')
+            distance_delta = curr_point.get('distance', 0)  # meters
+
+            if prev_elev is not None and curr_elev is not None and distance_delta > 0:
+                elev_diff = curr_elev - prev_elev  # meters
+                gradient = (elev_diff / distance_delta) * 100  # Convert to percentage
+
+        # Format elapsed time
+        hours = int(current_time // 3600)
+        minutes = int((current_time % 3600) // 60)
+        seconds = int(current_time % 60)
+        elapsed_time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
         # Build item data
         item_values = {
             'speed': (f"速度: {speed:.1f} km/h", (60, 50, 30, 200)),
             'distance': (f"距離: {elapsed_distance:.2f} km", (30, 50, 60, 200)),
             'elevation': (f"標高: {elevation:.1f} m", (30, 60, 30, 200)) if elevation is not None else None,
-            'heart_rate': (f"心拍数: {heart_rate} bpm", (60, 30, 30, 200)) if heart_rate else None
+            'heart_rate': (f"心拍数: {heart_rate} bpm", (60, 30, 30, 200)) if heart_rate else None,
+            'elapsed_time': (f"走行時間: {elapsed_time_str}", (40, 40, 60, 200)),
+            'gradient': (f"勾配: {gradient:+.1f}%", (50, 40, 30, 200)) if gradient is not None else None,
+            'cadence': (f"ケイデンス: {cadence} rpm", (50, 30, 50, 200)) if cadence else None,
+            'temperature': (f"気温: {temperature:.1f}°C", (30, 50, 50, 200)) if temperature is not None else None,
+            'calories': (f"カロリー: {int(calories)} kcal", (60, 40, 30, 200)) if calories is not None else None,
+            'power': (f"パワー: {int(power)} W", (50, 50, 30, 200)) if power is not None else None
         }
 
         # Filter items to display based on configuration
