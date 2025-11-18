@@ -4,7 +4,6 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, concatenate_videoclips
 import os
 from typing import Dict, List, Callable, Optional
-from staticmap import StaticMap, Line, CircleMarker
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -130,35 +129,73 @@ class VideoGenerator:
         return points[-1]
 
     def _generate_map(self, activity_data: Dict, current_point: Dict) -> Image:
-        """Generate a map image showing the route and current position"""
-        # Create static map
-        m = StaticMap(self.width, self.height, url_template='http://a.tile.openstreetmap.org/{z}/{x}/{y}.png')
+        """Generate a simple route visualization with line and current position marker (no map tiles)"""
+        # Create blank canvas
+        canvas = Image.new('RGB', (self.width, self.height), color=(20, 20, 20))
+        draw = ImageDraw.Draw(canvas)
 
-        # Add route line (all points up to current)
-        route_coords = []
+        # Extract all GPS coordinates
+        coords = []
         for point in activity_data['points']:
             lat = point.get('latitude')
             lon = point.get('longitude')
-            if lat and lon:
-                route_coords.append([lon, lat])
+            if lat is not None and lon is not None:
+                coords.append((lat, lon))
+
+        if len(coords) < 2:
+            return canvas
+
+        # Find bounds
+        lats = [c[0] for c in coords]
+        lons = [c[1] for c in coords]
+        min_lat, max_lat = min(lats), max(lats)
+        min_lon, max_lon = min(lons), max(lons)
+
+        # Add padding (10%)
+        lat_range = max_lat - min_lat if max_lat != min_lat else 0.01
+        lon_range = max_lon - min_lon if max_lon != min_lon else 0.01
+        padding = 0.1
+        min_lat -= lat_range * padding
+        max_lat += lat_range * padding
+        min_lon -= lon_range * padding
+        max_lon += lon_range * padding
+
+        # Convert GPS coordinates to pixel coordinates
+        def gps_to_pixel(lat, lon):
+            x = int((lon - min_lon) / (max_lon - min_lon) * (self.width - 100) + 50)
+            y = int((max_lat - lat) / (max_lat - min_lat) * (self.height - 100) + 50)
+            return (x, y)
+
+        # Draw route line (up to current point)
+        route_pixels = []
+        for point in activity_data['points']:
+            lat = point.get('latitude')
+            lon = point.get('longitude')
+            if lat is not None and lon is not None:
+                route_pixels.append(gps_to_pixel(lat, lon))
                 # Stop at current point
                 if point['elapsed_time'] >= current_point['elapsed_time']:
                     break
 
-        if len(route_coords) > 1:
-            line = Line(route_coords, '#0066FF', 4)
-            m.add_line(line)
+        # Draw the route line
+        if len(route_pixels) > 1:
+            draw.line(route_pixels, fill='#0066FF', width=4)
 
-        # Add current position marker
+        # Draw current position marker
         current_lat = current_point.get('latitude')
         current_lon = current_point.get('longitude')
-        if current_lat and current_lon:
-            marker = CircleMarker((current_lon, current_lat), '#FF0000', 12)
-            m.add_marker(marker)
+        if current_lat is not None and current_lon is not None:
+            current_pixel = gps_to_pixel(current_lat, current_lon)
+            marker_size = 12
+            draw.ellipse(
+                [current_pixel[0] - marker_size, current_pixel[1] - marker_size,
+                 current_pixel[0] + marker_size, current_pixel[1] + marker_size],
+                fill='#FF0000',
+                outline='#FFFFFF',
+                width=2
+            )
 
-        # Render map to PIL Image
-        map_image = m.render()
-        return map_image
+        return canvas
 
     def _generate_elevation_graph(self, activity_data: Dict, current_point: Dict, graph_width: int = 1920, graph_height: int = 250) -> Image:
         """Generate elevation profile graph with current position marker"""
