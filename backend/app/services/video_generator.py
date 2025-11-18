@@ -166,20 +166,30 @@ class VideoGenerator:
             y = int((max_lat - lat) / (max_lat - min_lat) * (self.height - 100) + 50)
             return (x, y)
 
-        # Draw route line (up to current point)
-        route_pixels = []
+        # Draw full route line first (start to goal) in gray
+        full_route_pixels = []
         for point in activity_data['points']:
             lat = point.get('latitude')
             lon = point.get('longitude')
             if lat is not None and lon is not None:
-                route_pixels.append(gps_to_pixel(lat, lon))
+                full_route_pixels.append(gps_to_pixel(lat, lon))
+
+        if len(full_route_pixels) > 1:
+            draw.line(full_route_pixels, fill='#555555', width=2)
+
+        # Draw completed route line (up to current point) in blue
+        completed_route_pixels = []
+        for point in activity_data['points']:
+            lat = point.get('latitude')
+            lon = point.get('longitude')
+            if lat is not None and lon is not None:
+                completed_route_pixels.append(gps_to_pixel(lat, lon))
                 # Stop at current point
                 if point['elapsed_time'] >= current_point['elapsed_time']:
                     break
 
-        # Draw the route line
-        if len(route_pixels) > 1:
-            draw.line(route_pixels, fill='#0066FF', width=4)
+        if len(completed_route_pixels) > 1:
+            draw.line(completed_route_pixels, fill='#0066FF', width=4)
 
         # Draw current position marker
         current_lat = current_point.get('latitude')
