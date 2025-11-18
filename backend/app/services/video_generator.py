@@ -7,10 +7,45 @@ from typing import Dict, List, Callable, Optional
 
 
 class VideoGenerator:
-    def __init__(self, width: int = 1920, height: int = 1080, fps: int = 30):
+    def __init__(self, width: int = 1920, height: int = 1080, fps: int = 30,
+                 layout: str = 'corners', font_size: str = 'medium', items: str = None):
         self.width = width
         self.height = height
         self.fps = fps
+        self.layout = layout
+        self.font_size = font_size
+
+        # Parse items configuration
+        self.display_items = self._parse_items(items)
+
+        # Font size mapping
+        self.font_sizes = {
+            'small': 30,
+            'medium': 45,
+            'large': 60
+        }
+
+    def _parse_items(self, items_str: str) -> Dict:
+        """Parse items string into position-item mapping
+        Format: "1:speed,2:distance,3:elevation,4:heart_rate"
+        """
+        if not items_str:
+            # Default items based on layout
+            return {
+                1: 'distance',
+                2: 'speed',
+                3: 'elevation',
+                4: 'heart_rate'
+            }
+
+        items_map = {}
+        for item_def in items_str.split(','):
+            item_def = item_def.strip()
+            if ':' in item_def:
+                pos, name = item_def.split(':', 1)
+                items_map[int(pos)] = name.strip()
+
+        return items_map
 
     def create_video(self, activity_data: Dict, output_path: str, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> str:
         """
@@ -114,6 +149,93 @@ class VideoGenerator:
         # Draw text
         draw.text((x, y), text, fill=text_color, font=font)
 
+    def _display_corners_layout(self, draw: ImageDraw.Draw, items: List, font):
+        """Display items in four corners (top-left, top-right, bottom-left, bottom-right)"""
+        positions = [
+            (50, 50),                           # Position 1: Top-left
+            (self.width - 400, 50),             # Position 2: Top-right
+            (50, self.height - 120),            # Position 3: Bottom-left
+            (self.width - 400, self.height - 120)  # Position 4: Bottom-right
+        ]
+
+        for i, (pos, text, bg_color) in enumerate(items):
+            if i < len(positions):
+                self._draw_text_with_background(
+                    draw,
+                    positions[i],
+                    text,
+                    font,
+                    (255, 255, 255),
+                    bg_color,
+                    padding=20,
+                    radius=15
+                )
+
+    def _display_bottom_right_layout(self, draw: ImageDraw.Draw, items: List, font):
+        """Display all items stacked in bottom-right corner"""
+        x = self.width - 450
+        y_start = self.height - 150
+        spacing = 80
+
+        for i, (pos, text, bg_color) in enumerate(items):
+            y = y_start - (i * spacing)
+            self._draw_text_with_background(
+                draw,
+                (x, y),
+                text,
+                font,
+                (255, 255, 255),
+                bg_color,
+                padding=20,
+                radius=15
+            )
+
+    def _display_top_layout(self, draw: ImageDraw.Draw, items: List, font):
+        """Display all items horizontally at the top"""
+        total_width = self.width - 100
+        num_items = len(items)
+        if num_items == 0:
+            return
+
+        spacing = total_width // num_items
+        y = 50
+
+        for i, (pos, text, bg_color) in enumerate(items):
+            x = 50 + (i * spacing)
+            self._draw_text_with_background(
+                draw,
+                (x, y),
+                text,
+                font,
+                (255, 255, 255),
+                bg_color,
+                padding=20,
+                radius=15
+            )
+
+    def _display_bottom_layout(self, draw: ImageDraw.Draw, items: List, font):
+        """Display all items horizontally at the bottom"""
+        total_width = self.width - 100
+        num_items = len(items)
+        if num_items == 0:
+            return
+
+        spacing = total_width // num_items
+        y = self.height - 120
+
+        for i, (pos, text, bg_color) in enumerate(items):
+            x = 50 + (i * spacing)
+            self._draw_text_with_background(
+                draw,
+                (x, y),
+                text,
+                font,
+                (255, 255, 255),
+                bg_color,
+                padding=20,
+                radius=15
+            )
+
     def _create_frame(self, point_data: Dict, current_time: float, activity_data: Dict) -> np.ndarray:
         """Create a single frame with activity data overlay"""
         # Create black background
@@ -123,7 +245,9 @@ class VideoGenerator:
         pil_image = Image.fromarray(frame)
         draw = ImageDraw.Draw(pil_image)
 
-        # Try to load Japanese font, fallback to default if not available
+        # Load font with specified size
+        font_size_px = self.font_sizes.get(self.font_size, 45)
+
         try:
             # Try Japanese fonts first
             font_paths = [
@@ -137,7 +261,7 @@ class VideoGenerator:
             font = None
             for font_path in font_paths:
                 try:
-                    font = ImageFont.truetype(font_path, 45)
+                    font = ImageFont.truetype(font_path, font_size_px)
                     break
                 except:
                     continue
@@ -162,58 +286,30 @@ class VideoGenerator:
         elevation = point_data.get('elevation', 0)
         heart_rate = point_data.get('heart_rate')
 
-        # Display data in single line format with rounded backgrounds
-        y_pos = 50
+        # Build item data
+        item_values = {
+            'speed': (f"速度: {speed:.1f} km/h", (60, 50, 30, 200)),
+            'distance': (f"距離: {elapsed_distance:.2f} km", (30, 50, 60, 200)),
+            'elevation': (f"標高: {elevation:.1f} m", (30, 60, 30, 200)) if elevation is not None else None,
+            'heart_rate': (f"心拍数: {heart_rate} bpm", (60, 30, 30, 200)) if heart_rate else None
+        }
 
-        # Distance (Top Left)
-        self._draw_text_with_background(
-            draw,
-            (50, y_pos),
-            f"距離: {elapsed_distance:.2f} km",
-            font,
-            (255, 255, 255),
-            (30, 50, 60, 200),
-            padding=20,
-            radius=15
-        )
+        # Filter items to display based on configuration
+        items_to_display = []
+        for pos in sorted(self.display_items.keys()):
+            item_name = self.display_items[pos]
+            if item_name in item_values and item_values[item_name] is not None:
+                items_to_display.append((pos, item_values[item_name][0], item_values[item_name][1]))
 
-        # Speed (Top Right)
-        self._draw_text_with_background(
-            draw,
-            (self.width - 400, y_pos),
-            f"速度: {speed:.1f} km/h",
-            font,
-            (255, 255, 255),
-            (60, 50, 30, 200),
-            padding=20,
-            radius=15
-        )
-
-        # Elevation (Bottom Left)
-        if elevation is not None:
-            self._draw_text_with_background(
-                draw,
-                (50, self.height - 120),
-                f"標高: {elevation:.1f} m",
-                font,
-                (255, 255, 255),
-                (30, 60, 30, 200),
-                padding=20,
-                radius=15
-            )
-
-        # Heart Rate (Bottom Right)
-        if heart_rate:
-            self._draw_text_with_background(
-                draw,
-                (self.width - 400, self.height - 120),
-                f"心拍数: {heart_rate} bpm",
-                font,
-                (255, 255, 255),
-                (60, 30, 30, 200),
-                padding=20,
-                radius=15
-            )
+        # Display items based on layout
+        if self.layout == 'corners':
+            self._display_corners_layout(draw, items_to_display, font)
+        elif self.layout == 'bottom-right':
+            self._display_bottom_right_layout(draw, items_to_display, font)
+        elif self.layout == 'top':
+            self._display_top_layout(draw, items_to_display, font)
+        elif self.layout == 'bottom':
+            self._display_bottom_layout(draw, items_to_display, font)
 
         # Convert back to numpy array
         frame = np.array(pil_image)

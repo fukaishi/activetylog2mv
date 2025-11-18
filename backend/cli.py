@@ -87,6 +87,29 @@ Examples:
         help='Require actual timestamp data in file (reject estimated time)'
     )
 
+    parser.add_argument(
+        '--layout',
+        type=str,
+        choices=['corners', 'bottom-right', 'top', 'bottom'],
+        default='corners',
+        help='Display layout: corners (四方), bottom-right (右下), top (上部), bottom (下部) (default: corners)'
+    )
+
+    parser.add_argument(
+        '--font-size',
+        type=str,
+        choices=['small', 'medium', 'large'],
+        default='medium',
+        help='Font size: small (30px), medium (45px), large (60px) (default: medium)'
+    )
+
+    parser.add_argument(
+        '--items',
+        type=str,
+        default=None,
+        help='Display items in format "1:speed,2:distance,3:elevation,4:heart_rate" (位置番号:項目名)'
+    )
+
     return parser.parse_args()
 
 
@@ -230,16 +253,22 @@ def analyze_activity_data(activity_data: Dict, file_path: str):
     print("=" * 70)
 
 
-def generate_video(activity_data, output_path: str, width: int, height: int, fps: int, verbose: bool = False):
+def generate_video(activity_data, output_path: str, width: int, height: int, fps: int, verbose: bool = False,
+                   layout: str = 'corners', font_size: str = 'medium', items: str = None):
     """Generate video from activity data"""
     if verbose:
         print(f"\nGenerating video...")
         print(f"  Output: {output_path}")
         print(f"  Resolution: {width}x{height}")
         print(f"  FPS: {fps}")
+        print(f"  Layout: {layout}")
+        print(f"  Font size: {font_size}")
+        if items:
+            print(f"  Items: {items}")
 
     try:
-        generator = VideoGenerator(width=width, height=height, fps=fps)
+        generator = VideoGenerator(width=width, height=height, fps=fps,
+                                  layout=layout, font_size=font_size, items=items)
 
         # Use progress callback if not verbose
         if not verbose:
@@ -334,7 +363,8 @@ def main():
         sys.exit(1)
 
     # Generate video
-    generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose)
+    generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose,
+                  args.layout, args.font_size, args.items)
 
     if args.verbose:
         print("=" * 60)
