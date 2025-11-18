@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="Test Activity Generator" version="1.1"
+  xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Test Morning Run - Tokyo</name>
+    <desc>Sample running activity in Tokyo for testing video generation</desc>
+    <time>2025-11-17T06:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Test Morning Run</name>
+    <type>running</type>
+    <trkseg>
+      <trkpt lat="35.681236" lon="139.767125">
+        <ele>10.5</ele>
+        <time>2025-11-17T06:00:00Z</time>
+      </trkpt>
+      <trkpt lat="35.681456" lon="139.767345">
+        <ele>10.8</ele>
+        <time>2025-11-17T06:00:05Z</time>
+      </trkpt>
+      <trkpt lat="35.681676" lon="139.767565">
+        <ele>11.2</ele>
+        <time>2025-11-17T06:00:10Z</time>
+      </trkpt>
+      <trkpt lat="35.681896" lon="139.767785">
+        <ele>11.5</ele>
+        <time>2025-11-17T06:00:15Z</time>
+      </trkpt>
+      <trkpt lat="35.682116" lon="139.768005">
+        <ele>12.0</ele>
+        <time>2025-11-17T06:00:20Z</time>
+      </trkpt>
+      <trkpt lat="35.682336" lon="139.768225">
+        <ele>12.3</ele>
+        <time>2025-11-17T06:00:25Z</time>
+      </trkpt>
+      <trkpt lat="35.682556" lon="139.768445">
+        <ele>12.8</ele>
+        <time>2025-11-17T06:00:30Z</time>
+      </trkpt>
+      <trkpt lat="35.682776" lon="139.768665">
+        <ele>13.2</ele>
+        <time>2025-11-17T06:00:35Z</time>
+      </trkpt>
+      <trkpt lat="35.682996" lon="139.768885">
+        <ele>13.5</ele>
+        <time>2025-11-17T06:00:40Z</time>
+      </trkpt>
+      <trkpt lat="35.683216" lon="139.769105">
+        <ele>14.0</ele>
+        <time>2025-11-17T06:00:45Z</time>
+      </trkpt>
+      <trkpt lat="35.683436" lon="139.769325">
+        <ele>14.5</ele>
+        <time>2025-11-17T06:00:50Z</time>
+      </trkpt>
+      <trkpt lat="35.683656" lon="139.769545">
+        <ele>15.0</ele>
+        <time>2025-11-17T06:00:55Z</time>
+      </trkpt>
+      <trkpt lat="35.683876" lon="139.769765">
+        <ele>15.3</ele>
+        <time>2025-11-17T06:01:00Z</time>
+      </trkpt>
+      <trkpt lat="35.684096" lon="139.769985">
+        <ele>15.8</ele>
+        <time>2025-11-17T06:01:05Z</time>
+      </trkpt>
+      <trkpt lat="35.684316" lon="139.770205">
+        <ele>16.2</ele>
+        <time>2025-11-17T06:01:10Z</time>
+      </trkpt>
+      <trkpt lat="35.684536" lon="139.770425">
+        <ele>16.5</ele>
+        <time>2025-11-17T06:01:15Z</time>
+      </trkpt>
+      <trkpt lat="35.684756" lon="139.770645">
+        <ele>17.0</ele>
+        <time>2025-11-17T06:01:20Z</time>
+      </trkpt>
+      <trkpt lat="35.684976" lon="139.770865">
+        <ele>17.5</ele>
+        <time>2025-11-17T06:01:25Z</time>
+      </trkpt>
+      <trkpt lat="35.685196" lon="139.771085">
+        <ele>18.0</ele>
+        <time>2025-11-17T06:01:30Z</time>
+      </trkpt>
+      <trkpt lat="35.685416" lon="139.771305">
+        <ele>18.3</ele>
+        <time>2025-11-17T06:01:35Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
