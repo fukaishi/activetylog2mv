@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Sample Activity" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Sample Route with GPS Data</name>
+    <trkseg>
+      <!-- 10 points over 5 minutes, Tokyo area -->
+      <trkpt lat="35.681236" lon="139.767125">
+        <ele>40.0</ele>
+        <time>2024-01-15T09:00:00Z</time>
+      </trkpt>
+      <trkpt lat="35.682000" lon="139.768000">
+        <ele>42.0</ele>
+        <time>2024-01-15T09:00:30Z</time>
+      </trkpt>
+      <trkpt lat="35.682800" lon="139.769000">
+        <ele>45.0</ele>
+        <time>2024-01-15T09:01:00Z</time>
+      </trkpt>
+      <trkpt lat="35.683500" lon="139.770000">
+        <ele>48.0</ele>
+        <time>2024-01-15T09:01:30Z</time>
+      </trkpt>
+      <trkpt lat="35.684200" lon="139.771000">
+        <ele>52.0</ele>
+        <time>2024-01-15T09:02:00Z</time>
+      </trkpt>
+      <trkpt lat="35.685000" lon="139.772000">
+        <ele>55.0</ele>
+        <time>2024-01-15T09:02:30Z</time>
+      </trkpt>
+      <trkpt lat="35.685800" lon="139.773000">
+        <ele>58.0</ele>
+        <time>2024-01-15T09:03:00Z</time>
+      </trkpt>
+      <trkpt lat="35.686500" lon="139.774000">
+        <ele>60.0</ele>
+        <time>2024-01-15T09:03:30Z</time>
+      </trkpt>
+      <trkpt lat="35.687200" lon="139.775000">
+        <ele>62.0</ele>
+        <time>2024-01-15T09:04:00Z</time>
+      </trkpt>
+      <trkpt lat="35.688000" lon="139.776000">
+        <ele>65.0</ele>
+        <time>2024-01-15T09:04:30Z</time>
+      </trkpt>
+      <trkpt lat="35.688800" lon="139.777000">
+        <ele>68.0</ele>
+        <time>2024-01-15T09:05:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
