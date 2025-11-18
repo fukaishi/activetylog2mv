@@ -117,9 +117,25 @@ Examples:
     )
 
     parser.add_argument(
+        '--map-position',
+        type=str,
+        choices=['background', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        default='background',
+        help='Map position: background (全体), top-left (左上), top-right (右上), bottom-left (左下), bottom-right (右下) (default: background)'
+    )
+
+    parser.add_argument(
         '--show-elevation',
         action='store_true',
-        help='Show elevation profile graph at bottom of video'
+        help='Show elevation profile graph'
+    )
+
+    parser.add_argument(
+        '--elevation-position',
+        type=str,
+        choices=['bottom', 'top', 'bottom-left', 'bottom-right', 'bottom-center'],
+        default='bottom',
+        help='Elevation graph position: bottom (下部全幅), top (上部全幅), bottom-left (左下), bottom-right (右下), bottom-center (下中央) (default: bottom)'
     )
 
     return parser.parse_args()
@@ -267,7 +283,7 @@ def analyze_activity_data(activity_data: Dict, file_path: str):
 
 def generate_video(activity_data, output_path: str, width: int, height: int, fps: int, verbose: bool = False,
                    layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False,
-                   show_elevation: bool = False):
+                   show_elevation: bool = False, map_position: str = 'background', elevation_position: str = 'bottom'):
     """Generate video from activity data"""
     if verbose:
         print(f"\nGenerating video...")
@@ -279,12 +295,17 @@ def generate_video(activity_data, output_path: str, width: int, height: int, fps
         if items:
             print(f"  Items: {items}")
         print(f"  Show map: {show_map}")
+        if show_map:
+            print(f"  Map position: {map_position}")
         print(f"  Show elevation: {show_elevation}")
+        if show_elevation:
+            print(f"  Elevation position: {elevation_position}")
 
     try:
         generator = VideoGenerator(width=width, height=height, fps=fps,
                                   layout=layout, font_size=font_size, items=items, show_map=show_map,
-                                  show_elevation=show_elevation)
+                                  show_elevation=show_elevation, map_position=map_position,
+                                  elevation_position=elevation_position)
 
         # Use progress callback if not verbose
         if not verbose:
@@ -380,7 +401,8 @@ def main():
 
     # Generate video
     generate_video(activity_data, output_path, args.width, args.height, args.fps, args.verbose,
-                  args.layout, args.font_size, args.items, args.show_map, args.show_elevation)
+                  args.layout, args.font_size, args.items, args.show_map, args.show_elevation,
+                  args.map_position, args.elevation_position)
 
     if args.verbose:
         print("=" * 60)

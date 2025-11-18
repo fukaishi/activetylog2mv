@@ -14,7 +14,7 @@ from io import BytesIO
 class VideoGenerator:
     def __init__(self, width: int = 1920, height: int = 1080, fps: int = 30,
                  layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False,
-                 show_elevation: bool = False):
+                 show_elevation: bool = False, map_position: str = 'background', elevation_position: str = 'bottom'):
         self.width = width
         self.height = height
         self.fps = fps
@@ -22,6 +22,8 @@ class VideoGenerator:
         self.font_size = font_size
         self.show_map = show_map
         self.show_elevation = show_elevation
+        self.map_position = map_position
+        self.elevation_position = elevation_position
 
         # Parse items configuration
         self.display_items = self._parse_items(items)
@@ -404,11 +406,10 @@ class VideoGenerator:
 
     def _create_frame(self, point_data: Dict, current_time: float, activity_data: Dict) -> np.ndarray:
         """Create a single frame with activity data overlay"""
-        # Create background (map or black)
-        if self.show_map:
-            # Generate map with current position
+        # Create background
+        if self.show_map and self.map_position == 'background':
+            # Generate map as background
             pil_image = self._generate_map(activity_data, point_data)
-            # Ensure size matches
             pil_image = pil_image.resize((self.width, self.height))
         else:
             # Create black background
@@ -483,14 +484,52 @@ class VideoGenerator:
         elif self.layout == 'bottom':
             self._display_bottom_layout(draw, items_to_display, font)
 
-        # Add elevation graph at bottom if enabled
-        if self.show_elevation:
-            graph_height = 250
-            elevation_graph = self._generate_elevation_graph(activity_data, point_data, self.width, graph_height)
+        # Add map if not background
+        if self.show_map and self.map_position != 'background':
+            map_width, map_height = 600, 400  # Small map size
+            map_image = self._generate_map(activity_data, point_data)
+            map_image = map_image.resize((map_width, map_height))
 
-            # Paste elevation graph at bottom of frame
-            graph_y_position = self.height - graph_height
-            pil_image.paste(elevation_graph, (0, graph_y_position))
+            # Calculate position based on map_position
+            if self.map_position == 'top-left':
+                map_x, map_y = 20, 20
+            elif self.map_position == 'top-right':
+                map_x, map_y = self.width - map_width - 20, 20
+            elif self.map_position == 'bottom-left':
+                map_x, map_y = 20, self.height - map_height - 20
+            elif self.map_position == 'bottom-right':
+                map_x, map_y = self.width - map_width - 20, self.height - map_height - 20
+
+            pil_image.paste(map_image, (map_x, map_y))
+
+        # Add elevation graph if enabled
+        if self.show_elevation:
+            # Determine graph size and position based on elevation_position
+            if self.elevation_position in ['bottom', 'top']:
+                # Full width
+                graph_width, graph_height = self.width, 250
+            elif self.elevation_position == 'bottom-center':
+                # Center width (60%)
+                graph_width, graph_height = int(self.width * 0.6), 250
+            else:
+                # Corner positions (40% width)
+                graph_width, graph_height = int(self.width * 0.4), 200
+
+            elevation_graph = self._generate_elevation_graph(activity_data, point_data, graph_width, graph_height)
+
+            # Calculate position
+            if self.elevation_position == 'bottom':
+                graph_x, graph_y = 0, self.height - graph_height
+            elif self.elevation_position == 'top':
+                graph_x, graph_y = 0, 0
+            elif self.elevation_position == 'bottom-center':
+                graph_x, graph_y = (self.width - graph_width) // 2, self.height - graph_height
+            elif self.elevation_position == 'bottom-left':
+                graph_x, graph_y = 20, self.height - graph_height - 20
+            elif self.elevation_position == 'bottom-right':
+                graph_x, graph_y = self.width - graph_width - 20, self.height - graph_height - 20
+
+            pil_image.paste(elevation_graph, (graph_x, graph_y))
 
         # Convert back to numpy array
         frame = np.array(pil_image)
