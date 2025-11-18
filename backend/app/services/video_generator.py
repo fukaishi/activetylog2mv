@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import ImageClip, concatenate_videoclips
 import os
 from typing import Dict, List, Callable, Optional
 import matplotlib
@@ -58,11 +57,12 @@ class VideoGenerator:
 
     def create_video(self, activity_data: Dict, output_path: str, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> str:
         """
-        Create a video from activity data
+        Create a video from activity data using OpenCV VideoWriter (memory-efficient)
 
         Args:
             activity_data: Parsed activity data from GPX/TCX/FIT file
             output_path: Path to save the output video
+            progress_callback: Optional callback for progress updates
 
         Returns:
             Path to the generated video file
@@ -77,47 +77,43 @@ class VideoGenerator:
         total_frames = int(total_duration * self.fps)
 
         if progress_callback:
-            progress_callback(0, total_frames, "Generating frames...")
+            progress_callback(0, total_frames, "Initializing video writer...")
 
-        # Generate frames
-        frames = []
-        for frame_idx in range(total_frames):
-            current_time = frame_idx / self.fps
+        # Initialize OpenCV VideoWriter
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'avc1' for H.264
+        video_writer = cv2.VideoWriter(output_path, fourcc, self.fps, (self.width, self.height))
 
-            # Find the closest data point for this time
-            point_data = self._get_point_at_time(points, current_time)
+        if not video_writer.isOpened():
+            raise RuntimeError("Failed to initialize video writer")
 
-            # Create frame with overlay
-            frame = self._create_frame(point_data, current_time, activity_data)
-            frames.append(frame)
+        try:
+            # Generate and write frames one at a time (memory-efficient)
+            for frame_idx in range(total_frames):
+                current_time = frame_idx / self.fps
 
-            # Report progress every 10 frames or at the end
-            if progress_callback and (frame_idx % 10 == 0 or frame_idx == total_frames - 1):
-                progress_callback(frame_idx + 1, total_frames, "Generating frames...")
+                # Find the closest data point for this time
+                point_data = self._get_point_at_time(points, current_time)
+
+                # Create frame with overlay (PIL Image)
+                pil_frame = self._create_frame(point_data, current_time, activity_data)
+
+                # Convert PIL Image to OpenCV format (BGR)
+                frame_array = np.array(pil_frame)
+                frame_bgr = cv2.cvtColor(frame_array, cv2.COLOR_RGB2BGR)
+
+                # Write frame directly to video file
+                video_writer.write(frame_bgr)
+
+                # Report progress every 10 frames or at the end
+                if progress_callback and (frame_idx % 10 == 0 or frame_idx == total_frames - 1):
+                    progress_callback(frame_idx + 1, total_frames, "Generating video...")
+
+        finally:
+            # Release video writer
+            video_writer.release()
 
         if progress_callback:
-            progress_callback(total_frames, total_frames, "Creating video clips...")
-
-        # Create video from frames using moviepy
-        clips = []
-        frame_duration = 1.0 / self.fps
-
-        for i, frame in enumerate(frames):
-            clip = ImageClip(frame).set_duration(frame_duration)
-            clips.append(clip)
-
-            if progress_callback and (i % 100 == 0 or i == len(frames) - 1):
-                progress_callback(i + 1, len(frames), "Creating video clips...")
-
-        final_clip = concatenate_videoclips(clips, method="compose")
-        final_clip.write_videofile(
-            output_path,
-            fps=self.fps,
-            codec='libx264',
-            audio=False,
-            preset='medium',
-            threads=4
-        )
+            progress_callback(total_frames, total_frames, "Video generation complete")
 
         return output_path
 
