@@ -134,66 +134,20 @@ class VideoGenerator:
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
             ]
 
-            font_large = None
+            font = None
             for font_path in font_paths:
                 try:
-                    font_large = ImageFont.truetype(font_path, 100)
-                    font_medium = ImageFont.truetype(font_path, 60)
-                    font_small = ImageFont.truetype(font_path, 45)
+                    font = ImageFont.truetype(font_path, 45)
                     break
                 except:
                     continue
 
-            if not font_large:
+            if not font:
                 raise Exception("No font found")
         except:
-            font_large = ImageFont.load_default()
-            font_medium = ImageFont.load_default()
-            font_small = ImageFont.load_default()
+            font = ImageFont.load_default()
 
-        # Format time as HH:MM:SS
-        hours = int(current_time // 3600)
-        minutes = int((current_time % 3600) // 60)
-        seconds = int(current_time % 60)
-        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
-        # Display data at different positions with rounded backgrounds
-        # Top Center: Elapsed Time
-        self._draw_text_with_background(
-            draw,
-            (self.width // 2 - 200, 50),
-            f"経過時間: {time_str}",
-            font_large,
-            (255, 255, 255),
-            (50, 50, 50, 200),
-            padding=30,
-            radius=20
-        )
-
-        # Top Right: Speed
-        speed = point_data.get('speed', 0)
-        self._draw_text_with_background(
-            draw,
-            (self.width - 550, 50),
-            f"速度",
-            font_medium,
-            (255, 200, 100),
-            (40, 40, 40, 200),
-            padding=25,
-            radius=15
-        )
-        self._draw_text_with_background(
-            draw,
-            (self.width - 550, 140),
-            f"{speed:.1f} km/h",
-            font_large,
-            (255, 255, 255),
-            (60, 50, 30, 200),
-            padding=30,
-            radius=20
-        )
-
-        # Top Left: Distance
+        # Calculate distance
         total_distance = activity_data['total_distance'] / 1000  # Convert to km
         elapsed_distance = 0
         for point in activity_data['points']:
@@ -203,105 +157,63 @@ class VideoGenerator:
                 break
         elapsed_distance = elapsed_distance / 1000  # Convert to km
 
+        # Get current values
+        speed = point_data.get('speed', 0)
+        elevation = point_data.get('elevation', 0)
+        heart_rate = point_data.get('heart_rate')
+
+        # Display data in single line format with rounded backgrounds
+        y_pos = 50
+
+        # Distance (Top Left)
         self._draw_text_with_background(
             draw,
-            (50, 50),
-            f"距離",
-            font_medium,
-            (100, 200, 255),
-            (40, 40, 40, 200),
-            padding=25,
-            radius=15
-        )
-        self._draw_text_with_background(
-            draw,
-            (50, 140),
-            f"{elapsed_distance:.2f} km",
-            font_large,
+            (50, y_pos),
+            f"距離: {elapsed_distance:.2f} km",
+            font,
             (255, 255, 255),
             (30, 50, 60, 200),
-            padding=30,
-            radius=20
+            padding=20,
+            radius=15
         )
 
-        # Bottom Left: Elevation
-        elevation = point_data.get('elevation', 0)
+        # Speed (Top Right)
+        self._draw_text_with_background(
+            draw,
+            (self.width - 400, y_pos),
+            f"速度: {speed:.1f} km/h",
+            font,
+            (255, 255, 255),
+            (60, 50, 30, 200),
+            padding=20,
+            radius=15
+        )
+
+        # Elevation (Bottom Left)
         if elevation is not None:
             self._draw_text_with_background(
                 draw,
-                (50, self.height - 280),
-                f"標高",
-                font_medium,
-                (100, 255, 100),
-                (40, 40, 40, 200),
-                padding=25,
-                radius=15
-            )
-            self._draw_text_with_background(
-                draw,
-                (50, self.height - 190),
-                f"{elevation:.1f} m",
-                font_large,
+                (50, self.height - 120),
+                f"標高: {elevation:.1f} m",
+                font,
                 (255, 255, 255),
                 (30, 60, 30, 200),
-                padding=30,
-                radius=20
+                padding=20,
+                radius=15
             )
 
-        # Bottom Right: Heart Rate (if available)
-        heart_rate = point_data.get('heart_rate')
+        # Heart Rate (Bottom Right)
         if heart_rate:
             self._draw_text_with_background(
                 draw,
-                (self.width - 550, self.height - 280),
-                f"心拍数",
-                font_medium,
-                (255, 100, 100),
-                (40, 40, 40, 200),
-                padding=25,
-                radius=15
-            )
-            self._draw_text_with_background(
-                draw,
-                (self.width - 550, self.height - 190),
-                f"{heart_rate} bpm",
-                font_large,
+                (self.width - 400, self.height - 120),
+                f"心拍数: {heart_rate} bpm",
+                font,
                 (255, 255, 255),
                 (60, 30, 30, 200),
-                padding=30,
-                radius=20
-            )
-
-        # Center: Current coordinates
-        lat = point_data.get('latitude', 0)
-        lon = point_data.get('longitude', 0)
-        if lat and lon:
-            coord_text = f"位置: {lat:.6f}, {lon:.6f}"
-            self._draw_text_with_background(
-                draw,
-                (self.width // 2 - 400, self.height // 2),
-                coord_text,
-                font_small,
-                (200, 200, 200),
-                (30, 30, 30, 180),
                 padding=20,
-                radius=12
+                radius=15
             )
-
-        # Bottom Center: Additional stats
-        avg_speed = activity_data.get('avg_speed', 0)
-        max_speed = activity_data.get('max_speed', 0)
-        stats_text = f"平均: {avg_speed:.1f} km/h  |  最高: {max_speed:.1f} km/h"
-        self._draw_text_with_background(
-            draw,
-            (self.width // 2 - 400, self.height - 100),
-            stats_text,
-            font_small,
-            (180, 180, 180),
-            (35, 35, 35, 180),
-            padding=20,
-            radius=12
-        )
 
         # Convert back to numpy array
         frame = np.array(pil_image)
