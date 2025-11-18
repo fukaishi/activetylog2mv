@@ -84,6 +84,36 @@ class VideoGenerator:
                 return point
         return points[-1]
 
+    def _draw_rounded_rectangle(self, draw: ImageDraw.Draw, xy: tuple, radius: int, fill: tuple, outline: tuple = None, width: int = 0):
+        """Draw a rounded rectangle"""
+        x1, y1, x2, y2 = xy
+        # Draw main rectangle
+        draw.rectangle([x1 + radius, y1, x2 - radius, y2], fill=fill, outline=outline, width=width)
+        draw.rectangle([x1, y1 + radius, x2, y2 - radius], fill=fill, outline=outline, width=width)
+        # Draw corners
+        draw.pieslice([x1, y1, x1 + radius * 2, y1 + radius * 2], 180, 270, fill=fill, outline=outline, width=width)
+        draw.pieslice([x2 - radius * 2, y1, x2, y1 + radius * 2], 270, 360, fill=fill, outline=outline, width=width)
+        draw.pieslice([x1, y2 - radius * 2, x1 + radius * 2, y2], 90, 180, fill=fill, outline=outline, width=width)
+        draw.pieslice([x2 - radius * 2, y2 - radius * 2, x2, y2], 0, 90, fill=fill, outline=outline, width=width)
+
+    def _draw_text_with_background(self, draw: ImageDraw.Draw, position: tuple, text: str, font, text_color: tuple, bg_color: tuple, padding: int = 20, radius: int = 15):
+        """Draw text with rounded background"""
+        # Get text size
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        x, y = position
+        # Draw rounded rectangle background
+        self._draw_rounded_rectangle(
+            draw,
+            (x - padding, y - padding, x + text_width + padding, y + text_height + padding),
+            radius,
+            fill=bg_color
+        )
+        # Draw text
+        draw.text((x, y), text, fill=text_color, font=font)
+
     def _create_frame(self, point_data: Dict, current_time: float, activity_data: Dict) -> np.ndarray:
         """Create a single frame with activity data overlay"""
         # Create black background
@@ -93,11 +123,29 @@ class VideoGenerator:
         pil_image = Image.fromarray(frame)
         draw = ImageDraw.Draw(pil_image)
 
-        # Try to load a font, fallback to default if not available
+        # Try to load Japanese font, fallback to default if not available
         try:
-            font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
-            font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 40)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
+            # Try Japanese fonts first
+            font_paths = [
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
+                "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            ]
+
+            font_large = None
+            for font_path in font_paths:
+                try:
+                    font_large = ImageFont.truetype(font_path, 100)
+                    font_medium = ImageFont.truetype(font_path, 60)
+                    font_small = ImageFont.truetype(font_path, 45)
+                    break
+                except:
+                    continue
+
+            if not font_large:
+                raise Exception("No font found")
         except:
             font_large = ImageFont.load_default()
             font_medium = ImageFont.load_default()
@@ -109,14 +157,41 @@ class VideoGenerator:
         seconds = int(current_time % 60)
         time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-        # Display data at different positions
-        # Top: Elapsed Time
-        draw.text((self.width // 2 - 150, 50), f"TIME: {time_str}", fill=(255, 255, 255), font=font_large)
+        # Display data at different positions with rounded backgrounds
+        # Top Center: Elapsed Time
+        self._draw_text_with_background(
+            draw,
+            (self.width // 2 - 200, 50),
+            f"経過時間: {time_str}",
+            font_large,
+            (255, 255, 255),
+            (50, 50, 50, 200),
+            padding=30,
+            radius=20
+        )
 
         # Top Right: Speed
         speed = point_data.get('speed', 0)
-        draw.text((self.width - 400, 50), f"SPEED", fill=(255, 200, 100), font=font_medium)
-        draw.text((self.width - 400, 100), f"{speed:.1f} km/h", fill=(255, 255, 255), font=font_large)
+        self._draw_text_with_background(
+            draw,
+            (self.width - 550, 50),
+            f"速度",
+            font_medium,
+            (255, 200, 100),
+            (40, 40, 40, 200),
+            padding=25,
+            radius=15
+        )
+        self._draw_text_with_background(
+            draw,
+            (self.width - 550, 140),
+            f"{speed:.1f} km/h",
+            font_large,
+            (255, 255, 255),
+            (60, 50, 30, 200),
+            padding=30,
+            radius=20
+        )
 
         # Top Left: Distance
         total_distance = activity_data['total_distance'] / 1000  # Convert to km
@@ -128,33 +203,105 @@ class VideoGenerator:
                 break
         elapsed_distance = elapsed_distance / 1000  # Convert to km
 
-        draw.text((50, 50), f"DISTANCE", fill=(100, 200, 255), font=font_medium)
-        draw.text((50, 100), f"{elapsed_distance:.2f} km", fill=(255, 255, 255), font=font_large)
+        self._draw_text_with_background(
+            draw,
+            (50, 50),
+            f"距離",
+            font_medium,
+            (100, 200, 255),
+            (40, 40, 40, 200),
+            padding=25,
+            radius=15
+        )
+        self._draw_text_with_background(
+            draw,
+            (50, 140),
+            f"{elapsed_distance:.2f} km",
+            font_large,
+            (255, 255, 255),
+            (30, 50, 60, 200),
+            padding=30,
+            radius=20
+        )
 
         # Bottom Left: Elevation
         elevation = point_data.get('elevation', 0)
         if elevation is not None:
-            draw.text((50, self.height - 150), f"ELEVATION", fill=(100, 255, 100), font=font_medium)
-            draw.text((50, self.height - 100), f"{elevation:.1f} m", fill=(255, 255, 255), font=font_large)
+            self._draw_text_with_background(
+                draw,
+                (50, self.height - 280),
+                f"標高",
+                font_medium,
+                (100, 255, 100),
+                (40, 40, 40, 200),
+                padding=25,
+                radius=15
+            )
+            self._draw_text_with_background(
+                draw,
+                (50, self.height - 190),
+                f"{elevation:.1f} m",
+                font_large,
+                (255, 255, 255),
+                (30, 60, 30, 200),
+                padding=30,
+                radius=20
+            )
 
         # Bottom Right: Heart Rate (if available)
         heart_rate = point_data.get('heart_rate')
         if heart_rate:
-            draw.text((self.width - 400, self.height - 150), f"HEART RATE", fill=(255, 100, 100), font=font_medium)
-            draw.text((self.width - 400, self.height - 100), f"{heart_rate} bpm", fill=(255, 255, 255), font=font_large)
+            self._draw_text_with_background(
+                draw,
+                (self.width - 550, self.height - 280),
+                f"心拍数",
+                font_medium,
+                (255, 100, 100),
+                (40, 40, 40, 200),
+                padding=25,
+                radius=15
+            )
+            self._draw_text_with_background(
+                draw,
+                (self.width - 550, self.height - 190),
+                f"{heart_rate} bpm",
+                font_large,
+                (255, 255, 255),
+                (60, 30, 30, 200),
+                padding=30,
+                radius=20
+            )
 
         # Center: Current coordinates
         lat = point_data.get('latitude', 0)
         lon = point_data.get('longitude', 0)
         if lat and lon:
-            coord_text = f"LAT: {lat:.6f}  LON: {lon:.6f}"
-            draw.text((self.width // 2 - 300, self.height // 2), coord_text, fill=(200, 200, 200), font=font_small)
+            coord_text = f"位置: {lat:.6f}, {lon:.6f}"
+            self._draw_text_with_background(
+                draw,
+                (self.width // 2 - 400, self.height // 2),
+                coord_text,
+                font_small,
+                (200, 200, 200),
+                (30, 30, 30, 180),
+                padding=20,
+                radius=12
+            )
 
         # Bottom Center: Additional stats
         avg_speed = activity_data.get('avg_speed', 0)
         max_speed = activity_data.get('max_speed', 0)
-        stats_text = f"AVG: {avg_speed:.1f} km/h  |  MAX: {max_speed:.1f} km/h"
-        draw.text((self.width // 2 - 300, self.height - 80), stats_text, fill=(180, 180, 180), font=font_small)
+        stats_text = f"平均: {avg_speed:.1f} km/h  |  最高: {max_speed:.1f} km/h"
+        self._draw_text_with_background(
+            draw,
+            (self.width // 2 - 400, self.height - 100),
+            stats_text,
+            font_small,
+            (180, 180, 180),
+            (35, 35, 35, 180),
+            padding=20,
+            radius=12
+        )
 
         # Convert back to numpy array
         frame = np.array(pil_image)
