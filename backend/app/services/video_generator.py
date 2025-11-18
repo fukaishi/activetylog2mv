@@ -5,17 +5,23 @@ from moviepy.editor import ImageClip, concatenate_videoclips
 import os
 from typing import Dict, List, Callable, Optional
 from staticmap import StaticMap, Line, CircleMarker
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+from io import BytesIO
 
 
 class VideoGenerator:
     def __init__(self, width: int = 1920, height: int = 1080, fps: int = 30,
-                 layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False):
+                 layout: str = 'corners', font_size: str = 'medium', items: str = None, show_map: bool = False,
+                 show_elevation: bool = False):
         self.width = width
         self.height = height
         self.fps = fps
         self.layout = layout
         self.font_size = font_size
         self.show_map = show_map
+        self.show_elevation = show_elevation
 
         # Parse items configuration
         self.display_items = self._parse_items(items)
@@ -151,6 +157,71 @@ class VideoGenerator:
         # Render map to PIL Image
         map_image = m.render()
         return map_image
+
+    def _generate_elevation_graph(self, activity_data: Dict, current_point: Dict, graph_width: int = 1920, graph_height: int = 250) -> Image:
+        """Generate elevation profile graph with current position marker"""
+        # Extract distance and elevation data
+        distances = []
+        elevations = []
+        cumulative_distance = 0
+
+        for point in activity_data['points']:
+            cumulative_distance += point.get('distance', 0) / 1000  # Convert to km
+            elevation = point.get('elevation')
+            if elevation is not None:
+                distances.append(cumulative_distance)
+                elevations.append(elevation)
+
+        if not distances or not elevations:
+            # No elevation data, return blank graph
+            return Image.new('RGB', (graph_width, graph_height), color=(0, 0, 0))
+
+        # Find current position distance
+        current_distance = 0
+        for point in activity_data['points']:
+            if point['elapsed_time'] > current_point['elapsed_time']:
+                break
+            current_distance += point.get('distance', 0) / 1000
+
+        # Create matplotlib figure
+        fig, ax = plt.subplots(figsize=(graph_width/100, graph_height/100), dpi=100)
+        fig.patch.set_facecolor('#1a1a1a')
+        ax.set_facecolor('#2a2a2a')
+
+        # Plot elevation profile
+        ax.fill_between(distances, elevations, color='#4CAF50', alpha=0.3)
+        ax.plot(distances, elevations, color='#4CAF50', linewidth=2)
+
+        # Mark current position
+        if current_distance <= max(distances):
+            # Find closest elevation for current distance
+            current_elevation = elevations[0]
+            for i, d in enumerate(distances):
+                if d >= current_distance:
+                    current_elevation = elevations[i]
+                    break
+
+            ax.plot(current_distance, current_elevation, 'ro', markersize=10, zorder=5)
+
+        # Styling
+        ax.set_xlabel('距離 (km)', color='white', fontsize=12)
+        ax.set_ylabel('標高 (m)', color='white', fontsize=12)
+        ax.tick_params(colors='white')
+        ax.grid(True, alpha=0.3, color='white')
+        ax.spines['bottom'].set_color('white')
+        ax.spines['left'].set_color('white')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # Convert plot to PIL Image
+        buf = BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        graph_image = Image.open(buf)
+
+        return graph_image
 
     def _draw_rounded_rectangle(self, draw: ImageDraw.Draw, xy: tuple, radius: int, fill: tuple, outline: tuple = None, width: int = 0):
         """Draw a rounded rectangle"""
@@ -411,6 +482,15 @@ class VideoGenerator:
             self._display_top_layout(draw, items_to_display, font)
         elif self.layout == 'bottom':
             self._display_bottom_layout(draw, items_to_display, font)
+
+        # Add elevation graph at bottom if enabled
+        if self.show_elevation:
+            graph_height = 250
+            elevation_graph = self._generate_elevation_graph(activity_data, point_data, self.width, graph_height)
+
+            # Paste elevation graph at bottom of frame
+            graph_y_position = self.height - graph_height
+            pil_image.paste(elevation_graph, (0, graph_y_position))
 
         # Convert back to numpy array
         frame = np.array(pil_image)
